@@ -1,6 +1,5 @@
 package com.bikestore.api.dto.request;
 
-import com.bikestore.api.entity.enums.ProductCategory;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -26,8 +25,8 @@ public record ProductRequest(
         @Min(value = 0, message = "Stock cannot be negative")
         Integer stock,
 
-        @NotNull(message = "Category is required")
-        ProductCategory category,
+        @NotNull(message = "Category ID is required")
+        Long categoryId,
 
         List<String> images
 ) {

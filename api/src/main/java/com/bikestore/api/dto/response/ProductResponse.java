@@ -1,7 +1,5 @@
 package com.bikestore.api.dto.response;
 
-import com.bikestore.api.entity.enums.ProductCategory;
-
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -12,7 +10,7 @@ public record ProductResponse(
         String description,
         BigDecimal price,
         Integer stock,
-        ProductCategory category,
+        CategoryResponse category,
         List<String> images,
         Boolean isActive
 ) {

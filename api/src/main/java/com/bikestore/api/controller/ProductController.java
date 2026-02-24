@@ -29,6 +29,20 @@ public class ProductController {
         return ResponseEntity.ok(productService.getById(id));
     }
 
+    @GetMapping("/category/{categoryId}")
+    public ResponseEntity<Page<ProductResponse>> getByCategory(
+            @PathVariable Long categoryId,
+            @PageableDefault(size = 10, sort = "name") Pageable pageable) {
+        return ResponseEntity.ok(productService.getByCategory(categoryId, pageable));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<Page<ProductResponse>> searchByName(
+            @RequestParam String name,
+            @PageableDefault(size = 10, sort = "name") Pageable pageable) {
+        return ResponseEntity.ok(productService.searchByName(name, pageable));
+    }
+
     @PostMapping
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
         return new ResponseEntity<>(productService.create(request), HttpStatus.CREATED);

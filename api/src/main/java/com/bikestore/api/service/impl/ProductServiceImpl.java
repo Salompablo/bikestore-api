@@ -2,10 +2,12 @@ package com.bikestore.api.service.impl;
 
 import com.bikestore.api.dto.request.ProductRequest;
 import com.bikestore.api.dto.response.ProductResponse;
+import com.bikestore.api.entity.Category;
 import com.bikestore.api.entity.Product;
 import com.bikestore.api.exception.ConflictException;
 import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.mapper.ProductMapper;
+import com.bikestore.api.repository.CategoryRepository;
 import com.bikestore.api.repository.ProductRepository;
 import com.bikestore.api.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
+    private final CategoryRepository categoryRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -36,12 +39,29 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<ProductResponse> getByCategory(Long categoryId, Pageable pageable) {
+        return productRepository.findByCategoryId(categoryId, pageable)
+                .map(productMapper::toResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductResponse> searchByName(String name, Pageable pageable) {
+        return productRepository.findByNameContainingIgnoreCase(name, pageable)
+                .map(productMapper::toResponse);
+    }
+
+    @Override
     @Transactional
     public ProductResponse create(ProductRequest request) {
         if (productRepository.findBySku(request.sku()).isPresent()) {
             throw new ConflictException("Product with SKU " + request.sku() + " already exists");
         }
-        Product product = productMapper.toEntity(request);
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.categoryId()));
+
+        Product product = productMapper.toEntity(request, category);
         return productMapper.toResponse(productRepository.save(product));
     }
 
@@ -54,8 +74,10 @@ public class ProductServiceImpl implements ProductService {
         if (!existingProduct.getSku().equals(request.sku()) && productRepository.findBySku(request.sku()).isPresent()) {
             throw new ConflictException("Product with SKU " + request.sku() + " already exists");
         }
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.categoryId()));
 
-        productMapper.updateProductFromRequest(existingProduct, request);
+        productMapper.updateProductFromRequest(existingProduct, request, category);
         return productMapper.toResponse(productRepository.save(existingProduct));
     }
 
