@@ -1,5 +1,6 @@
 package com.bikestore.api.controller;
 
+import com.bikestore.api.dto.request.GoogleLoginRequest;
 import com.bikestore.api.dto.request.LoginRequest;
 import com.bikestore.api.dto.request.RegisterRequest;
 import com.bikestore.api.dto.response.AuthResponse;
@@ -28,5 +29,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponse> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest request) {
+        return ResponseEntity.ok(authService.loginWithGoogle(request.token()));
     }
 }
