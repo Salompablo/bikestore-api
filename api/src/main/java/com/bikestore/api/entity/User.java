@@ -1,5 +1,6 @@
 package com.bikestore.api.entity;
 
+import com.bikestore.api.entity.enums.AuthProvider;
 import com.bikestore.api.entity.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
@@ -26,7 +27,7 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
+    @Column(length = 100)
     private String password;
 
     private String firstName;
@@ -34,6 +35,10 @@ public class User implements UserDetails {
 
     @Enumerated(EnumType.STRING)
     private Role role;
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private AuthProvider provider = AuthProvider.LOCAL;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
