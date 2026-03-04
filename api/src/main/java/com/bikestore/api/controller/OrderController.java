@@ -1,7 +1,7 @@
 package com.bikestore.api.controller;
 
 import com.bikestore.api.dto.response.OrderResponse;
-import com.bikestore.api.service.impl.OrderServiceImpl;
+import com.bikestore.api.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class OrderController {
 
-    private final OrderServiceImpl orderService;
+    private final OrderService orderService;
 
     @PreAuthorize("hasRole('CUSTOMER')")
     @GetMapping("/my-orders")
