@@ -158,4 +158,44 @@ public class AuthService {
         String jwtToken = jwtService.generateToken(user);
         return new AuthResponse(jwtToken, "Email verified successfully");
     }
+
+    @Transactional
+    public void requestAccountReactivation(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (user.getIsActive()) {
+            throw new ConflictException("Your account is already active.");
+        }
+
+        String reactivationCode = String.format("%06d", new java.util.Random().nextInt(1000000));
+
+        VerificationToken verificationToken = VerificationToken.builder()
+                .token(reactivationCode)
+                .user(user)
+                .expiresAt(LocalDateTime.now().plusMinutes(15))
+                .build();
+        verificationTokenRepository.save(verificationToken);
+
+        emailService.sendReactivationEmail(user.getEmail(), reactivationCode);
+    }
+
+    @Transactional
+    public AuthResponse processReactivation(String token) {
+        VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired reactivation token"));
+
+        if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("The reactivation token has expired");
+        }
+
+        User user = verificationToken.getUser();
+        user.setIsActive(true);
+        userRepository.save(user);
+
+        verificationTokenRepository.delete(verificationToken);
+
+        String jwtToken = jwtService.generateToken(user);
+        return new AuthResponse(jwtToken, "Account reactivated successfully. Welcome back!");
+    }
 }

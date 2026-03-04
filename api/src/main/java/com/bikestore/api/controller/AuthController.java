@@ -37,4 +37,15 @@ public class AuthController {
     public ResponseEntity<AuthResponse> verifyEmail(@RequestParam String token) {
         return ResponseEntity.ok(authService.verifyEmail(token));
     }
+
+    @PostMapping("/request-reactivation")
+    public ResponseEntity<Void> requestReactivation(@RequestParam String email) {
+        authService.requestAccountReactivation(email);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/reactivate")
+    public ResponseEntity<AuthResponse> processReactivation(@RequestParam String token) {
+        return ResponseEntity.ok(authService.processReactivation(token));
+    }
 }

@@ -18,7 +18,7 @@ public class EmailService {
         Resend resend = new Resend(resendApiKey);
 
         String htmlContent = String.format(
-                "<h2>¡Bienvenido a BikeStore!</h2>" +
+                "<h2>¡Bienvenido a Bikes Asaro!</h2>" +
                         "<p>Tu código de verificación de 6 dígitos es:</p>" +
                         "<h3>%s</h3>" +
                         "<p>Este código expirará en 15 minutos.</p>",
@@ -26,9 +26,9 @@ public class EmailService {
         );
 
         CreateEmailOptions params = CreateEmailOptions.builder()
-                .from("BikeStore <onboarding@resend.dev>")
+                .from("Bikes Asaro <onboarding@resend.dev>")
                 .to(toEmail)
-                .subject("Verifica tu cuenta en BikeStore")
+                .subject("Verifica tu cuenta en Bikes Asaro")
                 .html(htmlContent)
                 .build();
 
@@ -38,6 +38,31 @@ public class EmailService {
         } catch (ResendException e) {
             log.error("Failed to send verification email to: {}", toEmail, e);
             throw new RuntimeException("Error sending verification email");
+        }
+    }
+
+    public void sendReactivationEmail(String toEmail, String verificationCode) {
+        Resend resend = new Resend(resendApiKey);
+
+        String htmlContent = String.format(
+                "<h2>¡Te extrañábamos en Bikes Asaro!</h2>" +
+                        "<p>Recibimos una solicitud para reactivar tu cuenta. Tu código de seguridad es:</p>" +
+                        "<h3>%s</h3>" +
+                        "<p>Si no fuiste tú, simplemente ignora este correo.</p>",
+                verificationCode
+        );
+
+        CreateEmailOptions params = CreateEmailOptions.builder()
+                .from("Bikes Asaro <onboarding@resend.dev>")
+                .to(toEmail)
+                .subject("Reactiva tu cuenta en Bikes Asaro")
+                .html(htmlContent)
+                .build();
+
+        try {
+            resend.emails().send(params);
+        } catch (com.resend.core.exception.ResendException e) {
+            throw new RuntimeException("Error sending reactivation email");
         }
     }
 }
