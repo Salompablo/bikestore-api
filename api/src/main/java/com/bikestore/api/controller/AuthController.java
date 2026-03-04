@@ -9,10 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -34,5 +31,21 @@ public class AuthController {
     @PostMapping("/google")
     public ResponseEntity<AuthResponse> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest request) {
         return ResponseEntity.ok(authService.loginWithGoogle(request.token()));
+    }
+
+    @PostMapping("/verify")
+    public ResponseEntity<AuthResponse> verifyEmail(@RequestParam String token) {
+        return ResponseEntity.ok(authService.verifyEmail(token));
+    }
+
+    @PostMapping("/request-reactivation")
+    public ResponseEntity<Void> requestReactivation(@RequestParam String email) {
+        authService.requestAccountReactivation(email);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/reactivate")
+    public ResponseEntity<AuthResponse> processReactivation(@RequestParam String token) {
+        return ResponseEntity.ok(authService.processReactivation(token));
     }
 }
