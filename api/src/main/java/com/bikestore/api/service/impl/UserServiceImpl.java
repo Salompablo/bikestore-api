@@ -5,6 +5,8 @@ import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.repository.UserRepository;
 import com.bikestore.api.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,5 +24,11 @@ public class UserServiceImpl implements UserService {
 
         existingUser.setIsActive(false);
         userRepository.save(existingUser);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<User> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable);
     }
 }
