@@ -31,10 +31,19 @@ public class User implements UserDetails {
     private String password;
 
     private String firstName;
+
     private String lastName;
 
     @Enumerated(EnumType.STRING)
     private Role role;
+
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+
+    @Builder.Default
+    @Column(name = "is_email_verified", nullable = false)
+    private Boolean isEmailVerified = false;
 
     @Enumerated(EnumType.STRING)
     @Builder.Default
@@ -60,6 +69,6 @@ public class User implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
 
     @Override
-    public boolean isEnabled() { return true; }
+    public boolean isEnabled() { return this.isActive && this.isEmailVerified; }
 
 }
