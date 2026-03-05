@@ -28,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -52,27 +54,37 @@ public class CheckoutService {
         BigDecimal totalAmount = BigDecimal.ZERO;
         List<PreferenceItemRequest> mpItems = new ArrayList<>();
 
-        for (CartItemRequest itemReq : cartRequest.items()) {
-            Product product = productRepository.findById(itemReq.productId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + itemReq.productId()));
+        Map<Long, Integer> consolidatedCart = cartRequest.items().stream()
+                .collect(Collectors.groupingBy(
+                        CartItemRequest::productId,
+                        Collectors.summingInt(CartItemRequest::quantity)
+                ));
 
-            if (product.getStock() < itemReq.quantity()) {
+
+        for (Map.Entry<Long, Integer> entry : consolidatedCart.entrySet()) {
+            Long productId = entry.getKey();
+            Integer totalQuantity = entry.getValue();
+
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+
+            if (product.getStock() < totalQuantity) {
                 throw new ConflictException("Not enough stock for product: " + product.getName());
             }
 
             OrderItem orderItem = new OrderItem();
             orderItem.setProduct(product);
-            orderItem.setQuantity(itemReq.quantity());
+            orderItem.setQuantity(totalQuantity);
             orderItem.setUnitPrice(product.getPrice());
             order.addItem(orderItem);
 
-            BigDecimal itemTotal = product.getPrice().multiply(new BigDecimal(itemReq.quantity()));
+            BigDecimal itemTotal = product.getPrice().multiply(new BigDecimal(totalQuantity));
             totalAmount = totalAmount.add(itemTotal);
 
             PreferenceItemRequest mpItem = PreferenceItemRequest.builder()
                     .id(product.getId().toString())
                     .title(product.getName())
-                    .quantity(itemReq.quantity())
+                    .quantity(totalQuantity)
                     .currencyId("ARS")
                     .unitPrice(product.getPrice())
                     .build();
@@ -80,7 +92,6 @@ public class CheckoutService {
         }
 
         order.setTotalAmount(totalAmount);
-
         order = orderRepository.save(order);
 
         try {
