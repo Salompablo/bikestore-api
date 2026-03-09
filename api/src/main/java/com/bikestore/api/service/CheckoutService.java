@@ -60,7 +60,6 @@ public class CheckoutService {
                         Collectors.summingInt(CartItemRequest::quantity)
                 ));
 
-
         for (Map.Entry<Long, Integer> entry : consolidatedCart.entrySet()) {
             Long productId = entry.getKey();
             Integer totalQuantity = entry.getValue();
@@ -89,6 +88,34 @@ public class CheckoutService {
                     .unitPrice(product.getPrice())
                     .build();
             mpItems.add(mpItem);
+        }
+
+        BigDecimal shippingCost = cartRequest.shippingCost() != null ? cartRequest.shippingCost() : BigDecimal.ZERO;
+
+        if (shippingCost.compareTo(BigDecimal.ZERO) > 0) {
+            if (cartRequest.shippingAddress() == null || cartRequest.shippingAddress().trim().isEmpty() ||
+                    cartRequest.zipCode() == null || cartRequest.zipCode().trim().isEmpty()) {
+                throw new IllegalArgumentException("Shipping address and zip code are required for deliveries.");
+            }
+
+            PreferenceItemRequest shippingItem = PreferenceItemRequest.builder()
+                    .id("SHIPPING")
+                    .title("Costo de Envío")
+                    .quantity(1)
+                    .currencyId("ARS")
+                    .unitPrice(shippingCost)
+                    .build();
+            mpItems.add(shippingItem);
+
+            totalAmount = totalAmount.add(shippingCost);
+
+            order.setShippingCost(shippingCost);
+            order.setShippingAddress(cartRequest.shippingAddress());
+            order.setZipCode(cartRequest.zipCode());
+        } else {
+            order.setShippingCost(BigDecimal.ZERO);
+            order.setShippingAddress("Retiro en sucursal");
+            order.setZipCode("7600");
         }
 
         order.setTotalAmount(totalAmount);

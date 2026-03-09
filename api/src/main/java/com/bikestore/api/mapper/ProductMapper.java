@@ -22,6 +22,10 @@ public class ProductMapper {
                 .category(category)
                 .images(request.images() != null ? request.images() : new ArrayList<>())
                 .isActive(true)
+                .weight(request.weight())
+                .length(request.length())
+                .width(request.width())
+                .height(request.height())
                 .build();
     }
 
@@ -39,7 +43,11 @@ public class ProductMapper {
                         product.getCategory().getDescription()
                 ),
                 product.getImages(),
-                product.getIsActive()
+                product.getIsActive(),
+                product.getWeight(),
+                product.getLength(),
+                product.getWidth(),
+                product.getHeight()
         );
     }
 
@@ -50,6 +58,10 @@ public class ProductMapper {
         target.setStock(source.stock());
         target.setCategory(newCategory);
         target.setSku(source.sku());
+        target.setWeight(source.weight());
+        target.setLength(source.length());
+        target.setWidth(source.width());
+        target.setHeight(source.height());
 
         if (source.images() != null) {
             target.getImages().clear();

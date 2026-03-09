@@ -42,6 +42,22 @@ public class Product {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Double weight = 0.0;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Double length = 0.0;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Double width = 0.0;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Double height = 0.0;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "image_url", length = 512)

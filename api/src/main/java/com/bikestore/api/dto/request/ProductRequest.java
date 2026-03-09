@@ -28,6 +28,22 @@ public record ProductRequest(
         @NotNull(message = "Category ID is required")
         Long categoryId,
 
-        List<String> images
+        List<String> images,
+
+        @NotNull(message = "Weight is required")
+        @Min(0)
+        Double weight,
+
+        @NotNull(message = "Length is required")
+        @Min(0)
+        Double length,
+
+        @NotNull(message = "Width is required")
+        @Min(0)
+        Double width,
+
+        @NotNull(message = "Height is required")
+        @Min(0)
+        Double height
 ) {
 }

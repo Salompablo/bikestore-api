@@ -38,6 +38,19 @@ public class Order {
     @Column(name = "preference_id")
     private String preferenceId;
 
+    @Column(name = "shipping_address")
+    private String shippingAddress;
+
+    @Column(name = "zip_code")
+    private String zipCode;
+
+    @Column(name = "shipping_cost", nullable = false)
+    @Builder.Default
+    private BigDecimal shippingCost = BigDecimal.ZERO;
+
+    @Column(name = "tracking_number")
+    private String trackingNumber;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
