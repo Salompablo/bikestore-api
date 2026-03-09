@@ -9,6 +9,10 @@ public record OrderResponse(
         String status,
         BigDecimal totalAmount,
         LocalDateTime createdAt,
-        List<OrderItemResponse> items
+        List<OrderItemResponse> items,
+        String shippingAddress,
+        String zipCode,
+        BigDecimal shippingCost,
+        String trackingNumber
 ) {
 }

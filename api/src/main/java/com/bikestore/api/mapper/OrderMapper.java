@@ -25,7 +25,11 @@ public class OrderMapper {
                 order.getStatus().name(),
                 order.getTotalAmount(),
                 order.getCreatedAt(),
-                itemResponses
+                itemResponses,
+                order.getShippingAddress(),
+                order.getZipCode(),
+                order.getShippingCost(),
+                order.getTrackingNumber()
         );
     }
 

@@ -12,6 +12,10 @@ public record ProductResponse(
         Integer stock,
         CategoryResponse category,
         List<String> images,
-        Boolean isActive
+        Boolean isActive,
+        Double weight,
+        Double length,
+        Double width,
+        Double height
 ) {
 }
