@@ -21,27 +21,17 @@ public class ProductController {
     private final ProductService productService;
 
     @GetMapping
-    public ResponseEntity<Page<ProductResponse>> getAll(@PageableDefault(size = 10, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(productService.getAll(pageable));
+    public ResponseEntity<Page<ProductResponse>> getCatalog(
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String search,
+            @PageableDefault(size = 10, sort = "name") Pageable pageable) {
+        return ResponseEntity.ok(productService.getActiveProducts(categoryId, search, pageable));
     }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(productService.getById(id));
-    }
-
-    @GetMapping("/category/{categoryId}")
-    public ResponseEntity<Page<ProductResponse>> getByCategory(
-            @PathVariable Long categoryId,
-            @PageableDefault(size = 10, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(productService.getByCategory(categoryId, pageable));
-    }
-
-    @GetMapping("/search")
-    public ResponseEntity<Page<ProductResponse>> searchByName(
-            @RequestParam String name,
-            @PageableDefault(size = 10, sort = "name") Pageable pageable) {
-        return ResponseEntity.ok(productService.searchByName(name, pageable));
     }
 
     @PreAuthorize("hasRole('ADMIN')")

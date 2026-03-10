@@ -26,8 +26,13 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ProductResponse> getAll(Pageable pageable) {
-        return productRepository.findByIsActiveTrue(pageable).map(productMapper::toResponse);
+    public Page<ProductResponse> getActiveProducts(Long categoryId, String search, Pageable pageable) {
+
+        String safeSearch = (search == null) ? "" : search;
+
+        Page<Product> productPage = productRepository.searchActiveProducts(categoryId, safeSearch, pageable);
+
+        return productPage.map(productMapper::toResponse);
     }
 
     @Override
@@ -36,20 +41,6 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
         return productMapper.toResponse(product);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProductResponse> getByCategory(Long categoryId, Pageable pageable) {
-        return productRepository.findByCategoryId(categoryId, pageable)
-                .map(productMapper::toResponse);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ProductResponse> searchByName(String name, Pageable pageable) {
-        return productRepository.findByNameContainingIgnoreCase(name, pageable)
-                .map(productMapper::toResponse);
     }
 
     @Override
