@@ -65,4 +65,38 @@ public class EmailService {
             throw new RuntimeException("Error sending reactivation email");
         }
     }
+
+    public void sendPasswordResetEmail(String toEmail, String resetCode) {
+        Resend resend = new Resend(resendApiKey);
+
+        String htmlContent = String.format(
+                "<h2>Recuperación de contraseña - Bikes Asaro</h2>" +
+                        "<p>Hemos recibido una solicitud para restablecer tu contraseña.</p>" +
+                        "<p>Tu código de seguridad es:</p>" +
+                        "<h3>%s</h3>" +
+                        "<p>Este código expirará en 15 minutos.</p>" +
+                        "<p>Si no fuiste tú, ignora este correo.</p>",
+                resetCode
+        );
+
+        CreateEmailOptions params = CreateEmailOptions.builder()
+                .from("Bikes Asaro <onboarding@resend.dev>")
+                .to(toEmail)
+                .subject("Recuperación de contraseña en Bikes Asaro")
+                .html(htmlContent)
+                .build();
+
+        try {
+            resend.emails().send(params);
+            log.info("Password reset email sent successfully to: {}", toEmail);
+        } catch (ResendException e) {
+            log.error("Failed to send password reset email to: {}", toEmail, e);
+
+            System.out.println("=================================================");
+            System.out.println("🚨 CÓDIGO DE RECUPERACIÓN🚨");
+            System.out.println("Usuario: " + toEmail);
+            System.out.println("CÓDIGO: " + resetCode);
+            System.out.println("=================================================");
+        }
+    }
 }

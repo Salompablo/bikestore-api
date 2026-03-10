@@ -4,19 +4,16 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-public record RegisterRequest(
-        @NotBlank(message = "First name is required")
-        String firstName,
-
-        @NotBlank(message = "Last name is required")
-        String lastName,
-
+public record ResetPasswordRequest(
         @NotBlank(message = "Email is required")
-        @Email(message = "Email format is not valid")
+        @Email(message = "Email should be valid")
         String email,
 
-        @NotBlank(message = "Password is required")
+        @NotBlank(message = "Code is required")
+        String code,
+
+        @NotBlank(message = "New password is required")
         @Size(min = 6, max = 15, message = "Password must be between 6 and 15 characters long")
-        String password
+        String newPassword
 ) {
 }

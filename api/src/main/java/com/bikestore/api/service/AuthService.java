@@ -1,7 +1,9 @@
 package com.bikestore.api.service;
 
+import com.bikestore.api.dto.request.ForgotPasswordRequest;
 import com.bikestore.api.dto.request.LoginRequest;
 import com.bikestore.api.dto.request.RegisterRequest;
+import com.bikestore.api.dto.request.ResetPasswordRequest;
 import com.bikestore.api.dto.response.AuthResponse;
 import com.bikestore.api.entity.User;
 import com.bikestore.api.entity.VerificationToken;
@@ -10,6 +12,7 @@ import com.bikestore.api.entity.enums.Role;
 import com.bikestore.api.exception.AccountDeactivatedException;
 import com.bikestore.api.exception.ConflictException;
 import com.bikestore.api.exception.ResourceNotFoundException;
+import com.bikestore.api.mapper.UserMapper;
 import com.bikestore.api.repository.UserRepository;
 import com.bikestore.api.repository.VerificationTokenRepository;
 import com.bikestore.api.security.JwtService;
@@ -42,6 +45,8 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailService emailService;
+    private final UserMapper userMapper;
+    private final VerificationTokenService tokenService;
 
     @Value("${google.client.id}")
     private String googleClientId;
@@ -52,24 +57,11 @@ public class AuthService {
             throw new ConflictException("Email is already in use");
         }
 
-        User user = User.builder()
-                .firstName(request.firstName())
-                .lastName(request.lastName())
-                .email(request.email())
-                .password(passwordEncoder.encode(request.password()))
-                .role(Role.CUSTOMER)
-                .build();
-
+        String encodedPassword = passwordEncoder.encode(request.password());
+        User user = userMapper.toEntity(request, encodedPassword);
         user = userRepository.save(user);
 
-        String verificationCode = String.format("%06d", new Random().nextInt(1000000));
-
-        VerificationToken verificationToken = VerificationToken.builder()
-                .token(verificationCode)
-                .user(user)
-                .expiresAt(LocalDateTime.now().plusMinutes(15))
-                .build();
-        verificationTokenRepository.save(verificationToken);
+        String verificationCode = tokenService.generateAndSaveVerificationToken(user);
 
         emailService.sendVerificationEmail(user.getEmail(), verificationCode);
 
@@ -120,14 +112,7 @@ public class AuthService {
             }
 
             if (user == null) {
-                user = User.builder()
-                        .firstName(firstName != null ? firstName : "Usuario")
-                        .lastName(lastName != null ? lastName : "")
-                        .email(email)
-                        .role(Role.CUSTOMER)
-                        .provider(AuthProvider.GOOGLE)
-                        .isEmailVerified(true)
-                        .build();
+                user = userMapper.toGoogleUserEntity(email, firstName, lastName);
                 user = userRepository.save(user);
             }
 
@@ -142,18 +127,10 @@ public class AuthService {
 
     @Transactional
     public AuthResponse verifyEmail(String token) {
-        VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid verification token"));
+        User user = tokenService.validateAndDeleteToken(token);
 
-        if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("Verification token has expired");
-        }
-
-        User user = verificationToken.getUser();
         user.setIsEmailVerified(true);
         userRepository.save(user);
-
-        verificationTokenRepository.delete(verificationToken);
 
         String jwtToken = jwtService.generateToken(user);
         return new AuthResponse(jwtToken, "Email verified successfully");
@@ -168,34 +145,57 @@ public class AuthService {
             throw new ConflictException("Your account is already active.");
         }
 
-        String reactivationCode = String.format("%06d", new java.util.Random().nextInt(1000000));
-
-        VerificationToken verificationToken = VerificationToken.builder()
-                .token(reactivationCode)
-                .user(user)
-                .expiresAt(LocalDateTime.now().plusMinutes(15))
-                .build();
-        verificationTokenRepository.save(verificationToken);
+        String reactivationCode = tokenService.generateAndSaveVerificationToken(user);
 
         emailService.sendReactivationEmail(user.getEmail(), reactivationCode);
     }
 
     @Transactional
     public AuthResponse processReactivation(String token) {
-        VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid or expired reactivation token"));
+        User user = tokenService.validateAndDeleteToken(token);
 
-        if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("The reactivation token has expired");
-        }
-
-        User user = verificationToken.getUser();
         user.setIsActive(true);
         userRepository.save(user);
 
-        verificationTokenRepository.delete(verificationToken);
-
         String jwtToken = jwtService.generateToken(user);
         return new AuthResponse(jwtToken, "Account reactivated successfully. Welcome back!");
+    }
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new ResourceNotFoundException("No account found with this email"));
+
+        if (!user.getIsActive()) {
+            throw new ConflictException("Account is deactivated");
+        }
+
+        String resetCode = String.format("%06d", new Random().nextInt(999999));
+
+        user.setResetPasswordCode(resetCode);
+        user.setResetPasswordExpiresAt(LocalDateTime.now().plusMinutes(15));
+        userRepository.save(user);
+
+        emailService.sendPasswordResetEmail(user.getEmail(), resetCode);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new ResourceNotFoundException("No account found with this email"));
+
+        if (user.getResetPasswordCode() == null || !user.getResetPasswordCode().equals(request.code())) {
+            throw new ConflictException("Invalid reset code");
+        }
+
+        if (user.getResetPasswordExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new ConflictException("Reset code has expired");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        user.setResetPasswordCode(null);
+        user.setResetPasswordExpiresAt(null);
+
+        userRepository.save(user);
     }
 }

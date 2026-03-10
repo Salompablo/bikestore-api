@@ -8,6 +8,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -27,7 +28,7 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(length = 100)
+    @Column(nullable = false)
     private String password;
 
     private String firstName;
@@ -44,6 +45,12 @@ public class User implements UserDetails {
     @Builder.Default
     @Column(name = "is_email_verified", nullable = false)
     private Boolean isEmailVerified = false;
+
+    @Column(name = "reset_password_code")
+    private String resetPasswordCode;
+
+    @Column(name = "reset_password_expires_at")
+    private LocalDateTime resetPasswordExpiresAt;
 
     @Enumerated(EnumType.STRING)
     @Builder.Default
