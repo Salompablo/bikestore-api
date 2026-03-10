@@ -91,12 +91,6 @@ public class EmailService {
             log.info("Password reset email sent successfully to: {}", toEmail);
         } catch (ResendException e) {
             log.error("Failed to send password reset email to: {}", toEmail, e);
-
-            System.out.println("=================================================");
-            System.out.println("🚨 CÓDIGO DE RECUPERACIÓN🚨");
-            System.out.println("Usuario: " + toEmail);
-            System.out.println("CÓDIGO: " + resetCode);
-            System.out.println("=================================================");
         }
     }
 }
