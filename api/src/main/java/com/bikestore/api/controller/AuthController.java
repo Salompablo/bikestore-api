@@ -1,8 +1,6 @@
 package com.bikestore.api.controller;
 
-import com.bikestore.api.dto.request.GoogleLoginRequest;
-import com.bikestore.api.dto.request.LoginRequest;
-import com.bikestore.api.dto.request.RegisterRequest;
+import com.bikestore.api.dto.request.*;
 import com.bikestore.api.dto.response.AuthResponse;
 import com.bikestore.api.service.AuthService;
 import jakarta.validation.Valid;
@@ -10,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -47,5 +47,17 @@ public class AuthController {
     @PostMapping("/reactivate")
     public ResponseEntity<AuthResponse> processReactivation(@RequestParam String token) {
         return ResponseEntity.ok(authService.processReactivation(token));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(Map.of("message", "If the email exists, a reset code was sent."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(Map.of("message", "Password has been successfully reset."));
     }
 }
