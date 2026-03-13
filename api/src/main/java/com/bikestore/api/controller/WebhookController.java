@@ -1,6 +1,11 @@
 package com.bikestore.api.controller;
 
+import com.bikestore.api.annotation.ApiPublicErrors;
 import com.bikestore.api.service.CheckoutService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -15,12 +20,17 @@ import java.util.Map;
 @RequestMapping("/api/v1/webhook")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Webhooks", description = "Endpoints for receiving asynchronous events from external providers")
 public class WebhookController {
 
     private final CheckoutService checkoutService;
 
+    @Operation(summary = "Mercado Pago Webhook", description = "Receives payment status updates from Mercado Pago.")
+    @ApiResponse(responseCode = "200", description = "Webhook successfully processed")
+    @ApiPublicErrors
     @PostMapping("/mercadopago")
-    public ResponseEntity<String> receiveWebhook(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<String> receiveWebhook(
+            @Parameter(description = "Payload sent by Mercado Pago") @RequestBody Map<String, Object> payload) {
         try {
             log.info("Webhook received from Mercado Pago: {}", payload);
 
