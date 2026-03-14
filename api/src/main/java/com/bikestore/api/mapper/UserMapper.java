@@ -1,6 +1,7 @@
 package com.bikestore.api.mapper;
 
 import com.bikestore.api.dto.request.RegisterRequest;
+import com.bikestore.api.dto.response.UserResponse;
 import com.bikestore.api.entity.User;
 import com.bikestore.api.entity.enums.AuthProvider;
 import com.bikestore.api.entity.enums.Role;
@@ -29,5 +30,21 @@ public class UserMapper {
                 .provider(AuthProvider.GOOGLE)
                 .isEmailVerified(true)
                 .build();
+    }
+
+    public UserResponse toResponse(User user) {
+        if (user == null) {
+            return null;
+        }
+        return new UserResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getRole() != null ? user.getRole().name() : null,
+                user.getIsActive(),
+                user.getIsEmailVerified(),
+                user.getProvider() != null ? user.getProvider().name() : null
+        );
     }
 }
