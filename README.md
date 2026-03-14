@@ -218,7 +218,7 @@ This API is fully documented using OpenAPI 3. Once the application is running, y
 
 ## 👨‍💻 Author
 
-**Pablo Salom Pita** Full-Stack Developer
+**Pablo Salom Pita** | Full-Stack Developer
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/pablo-salom/)
 [![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/salompablo)
