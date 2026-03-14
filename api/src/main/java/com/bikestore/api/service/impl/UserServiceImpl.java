@@ -1,7 +1,9 @@
 package com.bikestore.api.service.impl;
 
+import com.bikestore.api.dto.response.UserResponse;
 import com.bikestore.api.entity.User;
 import com.bikestore.api.exception.ResourceNotFoundException;
+import com.bikestore.api.mapper.UserMapper;
 import com.bikestore.api.repository.UserRepository;
 import com.bikestore.api.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final UserMapper userMapper;
 
     @Override
     @Transactional
@@ -28,7 +31,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<User> getAllUsers(Pageable pageable) {
-        return userRepository.findAll(pageable);
+    public Page<UserResponse> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable)
+                .map(userMapper::toResponse);
     }
 }

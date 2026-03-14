@@ -4,6 +4,7 @@ import com.bikestore.api.annotation.ApiAdminErrors;
 import com.bikestore.api.annotation.ApiNotFound;
 import com.bikestore.api.dto.response.OrderResponse;
 import com.bikestore.api.dto.response.PageResponse;
+import com.bikestore.api.dto.response.UserResponse;
 import com.bikestore.api.entity.User;
 import com.bikestore.api.entity.enums.OrderStatus;
 import com.bikestore.api.service.OrderService;
@@ -57,10 +58,10 @@ public class AdminController {
     @ApiResponse(responseCode = "200", description = "Users successfully retrieved")
     @ApiAdminErrors
     @GetMapping("/users")
-    public ResponseEntity<PageResponse<User>> getAllUsers(
+    public ResponseEntity<PageResponse<UserResponse>> getAllUsers(
             @Parameter(hidden = true) @PageableDefault(size = 20, sort = "email", direction = Sort.Direction.ASC) Pageable pageable) {
 
-        Page<User> springPage = userService.getAllUsers(pageable);
+        Page<UserResponse> springPage = userService.getAllUsers(pageable);
         return ResponseEntity.ok(PageResponse.of(springPage));
     }
 }
