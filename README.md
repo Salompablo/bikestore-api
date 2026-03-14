@@ -53,7 +53,7 @@ This project is built with enterprise-grade standards to ensure maintainability,
 graph TD
     Client[Client Application / Frontend]
     
-    subgraph "Bikes Asaro API (Spring Boot)"
+    subgraph "Bikes Asaro API [(Spring Boot)]"
         Controllers[Controllers Layer<br/><i>Presentation & HTTP Routing</i>]
         Services[Services Layer<br/><i>Business Logic & Transactions</i>]
         Repositories[Repositories Layer<br/><i>Spring Data JPA Interfaces</i>]
