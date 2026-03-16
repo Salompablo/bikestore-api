@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Schema(description = "Payload for processing a shopping cart order")
-public record CartRequest(
+public record CheckoutRequest(
         @Schema(description = "List of items to purchase")
         @NotEmpty(message = "Cart cannot be empty")
         @Valid

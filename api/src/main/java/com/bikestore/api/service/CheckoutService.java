@@ -1,7 +1,7 @@
 package com.bikestore.api.service;
 
 import com.bikestore.api.dto.request.CartItemRequest;
-import com.bikestore.api.dto.request.CartRequest;
+import com.bikestore.api.dto.request.CheckoutRequest;
 import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.OrderItem;
 import com.bikestore.api.entity.Product;
@@ -13,7 +13,6 @@ import com.bikestore.api.repository.OrderRepository;
 import com.bikestore.api.repository.ProductRepository;
 import com.bikestore.api.repository.UserRepository;
 import com.mercadopago.client.payment.PaymentClient;
-import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
 import com.mercadopago.client.preference.PreferenceClient;
 import com.mercadopago.client.preference.PreferenceItemRequest;
 import com.mercadopago.client.preference.PreferenceRequest;
@@ -41,7 +40,7 @@ public class CheckoutService {
     private final UserRepository userRepository;
 
     @Transactional
-    public String createPaymentPreference(CartRequest cartRequest) {
+    public String createPaymentPreference(CheckoutRequest checkoutRequest) {
 
         String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(userEmail)
@@ -54,7 +53,7 @@ public class CheckoutService {
         BigDecimal totalAmount = BigDecimal.ZERO;
         List<PreferenceItemRequest> mpItems = new ArrayList<>();
 
-        Map<Long, Integer> consolidatedCart = cartRequest.items().stream()
+        Map<Long, Integer> consolidatedCart = checkoutRequest.items().stream()
                 .collect(Collectors.groupingBy(
                         CartItemRequest::productId,
                         Collectors.summingInt(CartItemRequest::quantity)
@@ -90,11 +89,11 @@ public class CheckoutService {
             mpItems.add(mpItem);
         }
 
-        BigDecimal shippingCost = cartRequest.shippingCost() != null ? cartRequest.shippingCost() : BigDecimal.ZERO;
+        BigDecimal shippingCost = checkoutRequest.shippingCost() != null ? checkoutRequest.shippingCost() : BigDecimal.ZERO;
 
         if (shippingCost.compareTo(BigDecimal.ZERO) > 0) {
-            if (cartRequest.shippingAddress() == null || cartRequest.shippingAddress().trim().isEmpty() ||
-                    cartRequest.zipCode() == null || cartRequest.zipCode().trim().isEmpty()) {
+            if (checkoutRequest.shippingAddress() == null || checkoutRequest.shippingAddress().trim().isEmpty() ||
+                    checkoutRequest.zipCode() == null || checkoutRequest.zipCode().trim().isEmpty()) {
                 throw new IllegalArgumentException("Shipping address and zip code are required for deliveries.");
             }
 
@@ -110,8 +109,8 @@ public class CheckoutService {
             totalAmount = totalAmount.add(shippingCost);
 
             order.setShippingCost(shippingCost);
-            order.setShippingAddress(cartRequest.shippingAddress());
-            order.setZipCode(cartRequest.zipCode());
+            order.setShippingAddress(checkoutRequest.shippingAddress());
+            order.setZipCode(checkoutRequest.zipCode());
         } else {
             order.setShippingCost(BigDecimal.ZERO);
             order.setShippingAddress("Retiro en sucursal");

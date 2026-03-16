@@ -1,7 +1,7 @@
 package com.bikestore.api.controller;
 
 import com.bikestore.api.annotation.ApiCustomerErrors;
-import com.bikestore.api.dto.request.CartRequest;
+import com.bikestore.api.dto.request.CheckoutRequest;
 import com.bikestore.api.service.CheckoutService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -37,7 +37,7 @@ public class CheckoutController {
     @ApiCustomerErrors
     @PreAuthorize("hasRole('CUSTOMER')")
     @PostMapping("/create-preference")
-    public ResponseEntity<Map<String, String>> createPreference(@Valid @RequestBody CartRequest request) {
+    public ResponseEntity<Map<String, String>> createPreference(@Valid @RequestBody CheckoutRequest request) {
         String preferenceId = checkoutService.createPaymentPreference(request);
         return ResponseEntity.ok(Map.of("preferenceId", preferenceId));
     }
