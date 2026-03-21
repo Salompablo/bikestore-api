@@ -35,13 +35,13 @@
 
 * **Advanced Security & Authentication:** * Stateless JWT authentication with Role-Based Access Control (`ADMIN` vs `CUSTOMER`).
   * Social Login via Google OAuth2.
-  * Account lifecycle management: Email verification (via Resend), deactivation, and secure password reset.
+  * Account lifecycle management: Email verification, deactivation, and secure password reset.
+  * **Cryptographically Secured Webhooks:** HMAC-SHA256 signature validation to prevent DoS attacks and payload spoofing.
 * **Catalog & Inventory:** * Searchable, filterable, and paginated product catalog.
   * Secure, direct image uploads to AWS S3 with strict 5MB payload limits.
-* **Smart Checkout:** * Real-time shopping cart validation.
-  * Dynamic shipping cost calculations based on destination ZIP code and cart weight.
-* **Order Management:** * Customers can track their paginated order history.
-  * Admins can update fulfillment and shipping statuses.
+* **Smart Checkout & Inventory Protection:** * Real-time shopping cart validation and dynamic shipping cost calculations.
+  * **Proactive Inventory Reservation:** Stock is atomically locked the moment a checkout is initialized to prevent race conditions and overselling.
+  * **Automated Abandoned Cart Recovery:** Background Cron Jobs (`@Scheduled`) automatically release reserved inventory if a user fails to pay within the allotted timeframe.
 
 ---
 
@@ -83,6 +83,7 @@ graph TD
 * **Generic Pagination Wrapper (`PageResponse<T>`):** Spring Data's native `Page` objects are intentionally hidden. A static factory method safely maps them to a clean, standardized pagination metadata object.
 * **Global Exception Handling:** A centralized `@RestControllerAdvice` captures errors and returns a standardized JSON `ErrorResponse`.
 * **Meta-Annotations for Swagger:** Complex OpenAPI configurations are abstracted into custom annotations (`@ApiAdminErrors`, `@ApiPublicErrors`, `@ApiNotFound`), keeping controllers clean.
+* **Facade Pattern & Transaction Boundaries:** Complex external workflows (like Checkout) use Orchestrator Facades to strictly separate internal database transactions (`@Transactional`) from slow external network calls (Mercado Pago SDK), protecting the database connection pool under heavy load.
 
 ---
 
@@ -94,38 +95,40 @@ This API integrates deeply with **Mercado Pago** to ensure secure, asynchronous 
 sequenceDiagram
     autonumber
     participant C as Client (Frontend)
-    participant API as Bikes Asaro Backend
+    participant API as CheckoutFacade
     participant DB as PostgreSQL DB
     participant MP as Mercado Pago API
     
-    %% Phase 1: Preference Creation
+    %% Phase 1: Preference Creation & Reservation
     rect rgb(240, 248, 255)
-    Note over C, MP: 1. Checkout & Preference Creation
-    C->>API: POST /checkout/create-preference (Cart Data)
+    Note over C, MP: 1. Checkout & Inventory Reservation
+    C->>API: POST /checkout/create-preference
     activate API
-    API->>DB: Validate Stock & Calculate Totals
+    API->>DB: Atomic Stock Deduction (Reserve Inventory)
+    API->>DB: Create PENDING Order
     API->>MP: Create Payment Preference
-    MP-->>API: Returns preferenceId
-    API-->>C: Returns preferenceId
+    MP-->>API: Returns preferenceId & initPoint
+    API-->>C: Returns CheckoutResponse DTO
     deactivate API
     end
     
     %% Phase 2: User Payment
     rect rgb(255, 250, 240)
     Note over C, MP: 2. User Payment Execution
-    C->>MP: Completes Payment Flow securely on Mercado Pago
+    C->>MP: Completes Payment Flow securely
     end
     
     %% Phase 3: Webhook & Fulfillment
     rect rgb(240, 255, 240)
-    Note over MP, DB: 3. Asynchronous Fulfillment (Webhook)
-    MP-->>API: POST /webhook/mercadopago (Payment Event)
+    Note over MP, DB: 3. Asynchronous Fulfillment (Webhook/IPN)
+    MP-->>API: POST /webhook/mercadopago
     activate API
-    API->>MP: Call MP API to verify Payment Status
+    API->>API: Validate Cryptographic Signature (HMAC-SHA256)
+    API->>MP: Fetch actual Payment Status (Secure SDK Call)
     MP-->>API: Confirms Payment is APPROVED
+    API->>DB: Check Idempotency (Is Order already PAID?)
     API->>DB: Update Order Status to PAID
-    API->>DB: Deduct Purchased Inventory
-    API-->>MP: 200 OK (Acknowledge Webhook)
+    API-->>MP: 200 OK
     deactivate API
     end
 ```
@@ -178,6 +181,8 @@ GOOGLE_CLIENT_ID=your_google_oauth_client_id
 
 # Mercado Pago
 MP_ACCESS_TOKEN=your_mercado_pago_access_token
+MP_WEBHOOK_SECRET=your_mercado_pago_webhook_signature_secret
+MP_NOTIFICATION_URL=https://your-domain.com/api/v1/webhook/mercadopago
 
 # AWS S3 (Media Storage)
 AWS_REGION=sa-east-1
