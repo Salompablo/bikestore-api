@@ -15,4 +15,9 @@ public record LoginRequest(
         @NotBlank(message = "Password is required")
         String password
 ) {
+        public LoginRequest {
+                if (email != null) {
+                        email = email.trim().toLowerCase();
+                }
+        }
 }
