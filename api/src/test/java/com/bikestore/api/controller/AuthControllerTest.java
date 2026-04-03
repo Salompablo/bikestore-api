@@ -34,7 +34,7 @@ class AuthControllerTest {
         @Test
         @DisplayName("Should return 201 CREATED with AuthResponse when registration succeeds")
         void register_success_returns201() {
-            RegisterRequest request = new RegisterRequest("Joe", "Luani", "joe@example.com", "Secret123");
+            RegisterRequest request = new RegisterRequest("John", "Doe", "john@example.com", "Secret123");
             AuthResponse expected = new AuthResponse("", "User registered successfully. Please check your email for the verification code.");
 
             when(authService.register(request)).thenReturn(expected);
@@ -45,7 +45,7 @@ class AuthControllerTest {
             assertNotNull(response.getBody());
             assertEquals(expected.token(), response.getBody().token());
             assertEquals(expected.message(), response.getBody().message());
-            verify(authService, times(1)).register(request);
+            verify(authService).register(request);
         }
 
         @Test
@@ -81,7 +81,7 @@ class AuthControllerTest {
             assertNotNull(response.getBody());
             assertEquals("jwt-token", response.getBody().token());
             assertEquals("Login successful", response.getBody().message());
-            verify(authService, times(1)).login(request);
+            verify(authService).login(request);
         }
 
         @Test
@@ -114,7 +114,7 @@ class AuthControllerTest {
             assertNotNull(response.getBody());
             assertEquals("jwt-google-token", response.getBody().token());
             assertEquals("Google login successful", response.getBody().message());
-            verify(authService, times(1)).loginWithGoogle("google-id-token");
+            verify(authService).loginWithGoogle("google-id-token");
         }
 
         @Test
@@ -150,7 +150,7 @@ class AuthControllerTest {
             assertNotNull(response.getBody());
             assertEquals("jwt-verified-token", response.getBody().token());
             assertEquals("Email verified successfully", response.getBody().message());
-            verify(authService, times(1)).verifyEmail(token);
+            verify(authService).verifyEmail(token);
         }
 
         @Test
@@ -180,7 +180,7 @@ class AuthControllerTest {
 
             assertEquals(HttpStatus.OK, response.getStatusCode());
             assertNull(response.getBody());
-            verify(authService, times(1)).requestAccountReactivation(email);
+            verify(authService).requestAccountReactivation(email);
         }
 
         @Test
@@ -213,7 +213,7 @@ class AuthControllerTest {
             assertNotNull(response.getBody());
             assertEquals("jwt-reactivated-token", response.getBody().token());
             assertEquals("Account reactivated successfully. Welcome back!", response.getBody().message());
-            verify(authService, times(1)).processReactivation(token);
+            verify(authService).processReactivation(token);
         }
 
         @Test
@@ -244,7 +244,7 @@ class AuthControllerTest {
             assertEquals(HttpStatus.OK, response.getStatusCode());
             assertNotNull(response.getBody());
             assertEquals("If the email exists, a reset code was sent.", response.getBody().get("message"));
-            verify(authService, times(1)).forgotPassword(request);
+            verify(authService).forgotPassword(request);
         }
 
         @Test
@@ -275,7 +275,7 @@ class AuthControllerTest {
             assertEquals(HttpStatus.OK, response.getStatusCode());
             assertNotNull(response.getBody());
             assertEquals("Password has been successfully reset.", response.getBody().get("message"));
-            verify(authService, times(1)).resetPassword(request);
+            verify(authService).resetPassword(request);
         }
 
         @Test
