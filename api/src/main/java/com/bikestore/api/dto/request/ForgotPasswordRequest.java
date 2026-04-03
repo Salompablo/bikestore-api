@@ -11,4 +11,9 @@ public record ForgotPasswordRequest(
         @Email(message = "Email should be valid")
         String email
 ) {
+        public ForgotPasswordRequest {
+                if (email != null) {
+                        email = email.trim().toLowerCase();
+                }
+        }
 }

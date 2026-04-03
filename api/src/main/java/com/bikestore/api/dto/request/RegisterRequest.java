@@ -25,4 +25,16 @@ public record RegisterRequest(
         @Size(min = 6, max = 15, message = "Password must be between 6 and 15 characters long")
         String password
 ) {
+
+        public RegisterRequest {
+                if (email != null) {
+                        email = email.trim().toLowerCase();
+                }
+                if (firstName != null) {
+                        firstName = firstName.trim();
+                }
+                if (lastName != null) {
+                        lastName = lastName.trim();
+                }
+        }
 }

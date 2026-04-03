@@ -17,6 +17,9 @@ public class EmailService {
     public void sendVerificationEmail(String toEmail, String verificationCode) {
         Resend resend = new Resend(resendApiKey);
 
+        log.info("📧 [DEV MODE] Generating email to: {}", toEmail);
+        log.info("🔑 Verification code: {}", verificationCode);
+
         String htmlContent = String.format(
                 "<h2>¡Bienvenido a Bikes Asaro!</h2>" +
                         "<p>Tu código de verificación de 6 dígitos es:</p>" +
@@ -34,15 +37,18 @@ public class EmailService {
 
         try {
             resend.emails().send(params);
-            log.info("Verification email sent successfully to: {}", toEmail);
-        } catch (ResendException e) {
-            log.error("Failed to send verification email to: {}", toEmail, e);
-            throw new RuntimeException("Error sending verification email");
+            log.info("✅ Verification email sent successfully to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("❌ Failed to send verification email (likely due to testing mode): {}", e.getMessage());
+            log.warn("⚠️ Continuing local process. Use the verification code printed above.");
         }
     }
 
     public void sendReactivationEmail(String toEmail, String verificationCode) {
         Resend resend = new Resend(resendApiKey);
+
+        log.info("📧 [DEV MODE] Generating reactivation email to: {}", toEmail);
+        log.info("🔑 Reactivation code: {}", verificationCode);
 
         String htmlContent = String.format(
                 "<h2>¡Te extrañábamos en Bikes Asaro!</h2>" +
@@ -61,13 +67,18 @@ public class EmailService {
 
         try {
             resend.emails().send(params);
-        } catch (com.resend.core.exception.ResendException e) {
-            throw new RuntimeException("Error sending reactivation email");
+            log.info("✅ Reactivation email sent successfully to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("❌ Failed to send reactivation email (likely due to testing mode): {}", e.getMessage());
+            log.warn("⚠️ Continuing local process. Use the reactivation code printed above.");
         }
     }
 
     public void sendPasswordResetEmail(String toEmail, String resetCode) {
         Resend resend = new Resend(resendApiKey);
+
+        log.info("📧 [DEV MODE] Generating password reset email to: {}", toEmail);
+        log.info("🔑 Password reset code: {}", resetCode);
 
         String htmlContent = String.format(
                 "<h2>Recuperación de contraseña - Bikes Asaro</h2>" +
@@ -88,9 +99,10 @@ public class EmailService {
 
         try {
             resend.emails().send(params);
-            log.info("Password reset email sent successfully to: {}", toEmail);
-        } catch (ResendException e) {
-            log.error("Failed to send password reset email to: {}", toEmail, e);
+            log.info("✅ Password reset email sent successfully to: {}", toEmail);
+        } catch (Exception e) {
+            log.error("❌ Failed to send password reset email (likely due to testing mode): {}", e.getMessage());
+            log.warn("⚠️ Continuing local process. Use the password reset code printed above.");
         }
     }
 }

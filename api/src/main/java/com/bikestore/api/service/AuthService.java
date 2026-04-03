@@ -6,15 +6,11 @@ import com.bikestore.api.dto.request.RegisterRequest;
 import com.bikestore.api.dto.request.ResetPasswordRequest;
 import com.bikestore.api.dto.response.AuthResponse;
 import com.bikestore.api.entity.User;
-import com.bikestore.api.entity.VerificationToken;
-import com.bikestore.api.entity.enums.AuthProvider;
-import com.bikestore.api.entity.enums.Role;
 import com.bikestore.api.exception.AccountDeactivatedException;
 import com.bikestore.api.exception.ConflictException;
 import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.mapper.UserMapper;
 import com.bikestore.api.repository.UserRepository;
-import com.bikestore.api.repository.VerificationTokenRepository;
 import com.bikestore.api.security.JwtService;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
@@ -43,7 +39,6 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
-    private final VerificationTokenRepository verificationTokenRepository;
     private final EmailService emailService;
     private final UserMapper userMapper;
     private final VerificationTokenService tokenService;
@@ -64,6 +59,7 @@ public class AuthService {
         String verificationCode = tokenService.generateAndSaveVerificationToken(user);
 
         emailService.sendVerificationEmail(user.getEmail(), verificationCode);
+        log.info("⚙️ DEV MODE - Verification code for {}: {}", user.getEmail(), verificationCode);
 
         return new AuthResponse("", "User registered successfully. Please check your email for the verification code.");
     }
@@ -90,6 +86,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse loginWithGoogle(String googleToken) {
+
         try {
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
                     .setAudience(Collections.singletonList(googleClientId))
