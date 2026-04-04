@@ -29,7 +29,7 @@ public class JwtService {
         String role = userDetails.getAuthorities().stream()
                 .findFirst()
                 .map(GrantedAuthority::getAuthority)
-                .orElse("");
+                .orElseThrow(() -> new IllegalStateException("User has no assigned role"));
         extraClaims.put("role", role);
         return buildToken(extraClaims, userDetails, jwtExpiration);
     }
