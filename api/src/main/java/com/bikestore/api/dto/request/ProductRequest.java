@@ -1,10 +1,7 @@
 package com.bikestore.api.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,6 +17,8 @@ public record ProductRequest(
         String name,
 
         @Schema(description = "Detailed description of the product", example = "Great mountain bike for beginners.")
+        @NotBlank(message = "Description is required")
+        @Size(min = 10, message = "Description must be at least 10 characters long")
         String description,
 
         @Schema(description = "Product price in local currency", example = "850000.00")
