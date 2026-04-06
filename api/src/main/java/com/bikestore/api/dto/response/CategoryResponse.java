@@ -11,6 +11,9 @@ public record CategoryResponse(
         String name,
 
         @Schema(description = "Category description", example = "Bicycles designed for off-road cycling.")
-        String description
+        String description,
+
+        @Schema(description = "Default image URL for products without images", example = "https://bucket.s3.amazonaws.com/categories/mountain-bikes.jpg")
+        String defaultImageUrl
 ) {
 }

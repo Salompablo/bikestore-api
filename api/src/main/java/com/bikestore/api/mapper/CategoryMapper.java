@@ -15,7 +15,8 @@ public class CategoryMapper {
         return new CategoryResponse(
                 category.getId(),
                 category.getName(),
-                category.getDescription()
+                category.getDescription(),
+                category.getDefaultImageUrl()
         );
     }
 
@@ -26,6 +27,7 @@ public class CategoryMapper {
         Category category = new Category();
         category.setName(request.name());
         category.setDescription(request.description());
+        category.setDefaultImageUrl(request.defaultImageUrl());
         return category;
     }
 
@@ -35,5 +37,6 @@ public class CategoryMapper {
         }
         category.setName(request.name());
         category.setDescription(request.description());
+        category.setDefaultImageUrl(request.defaultImageUrl());
     }
 }

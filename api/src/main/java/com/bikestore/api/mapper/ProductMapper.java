@@ -40,7 +40,8 @@ public class ProductMapper {
                 new CategoryResponse(
                         product.getCategory().getId(),
                         product.getCategory().getName(),
-                        product.getCategory().getDescription()
+                        product.getCategory().getDescription(),
+                        product.getCategory().getDefaultImageUrl()
                 ),
                 product.getImages(),
                 product.getIsActive(),
