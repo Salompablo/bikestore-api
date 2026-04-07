@@ -96,4 +96,16 @@ public class ProductController {
         productService.delete(id);
         return ResponseEntity.noContent().build();
     }
+
+    @Operation(summary = "Activate a product", description = "Reactivates a previously deactivated product. Requires ADMIN privileges.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Product successfully activated"),
+            @ApiResponse(responseCode = "403", description = "Access denied (Not an Admin)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @ApiNotFound
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/{id}/activate")
+    public ResponseEntity<ProductResponse> activateProduct(@PathVariable Long id) {
+        return ResponseEntity.ok(productService.activateProduct(id));
+    }
 }

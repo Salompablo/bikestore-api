@@ -16,7 +16,8 @@ public class CategoryMapper {
                 category.getId(),
                 category.getName(),
                 category.getDescription(),
-                category.getDefaultImageUrl()
+                category.getDefaultImageUrl(),
+                category.getIsActive()
         );
     }
 

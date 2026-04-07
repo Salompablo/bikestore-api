@@ -85,6 +85,23 @@ public class ProductServiceImpl implements ProductService {
         productRepository.save(product);
     }
 
+    @Override
+    @Transactional
+    public ProductResponse activateProduct(Long id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+
+        if (Boolean.TRUE.equals(product.getIsActive())) {
+            throw new ConflictException("Product with id: " + id + " is already active.");
+        }
+
+        validateCategoryIsActive(product.getCategory());
+
+        product.setIsActive(true);
+        Product activatedProduct = productRepository.save(product);
+        return productMapper.toResponse(activatedProduct);
+    }
+
     private void validateCategoryIsActive(Category category) {
         if (!Boolean.TRUE.equals(category.getIsActive())) {
             throw new ConflictException(

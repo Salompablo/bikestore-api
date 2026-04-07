@@ -88,4 +88,16 @@ public class CategoryController {
         categoryService.deleteCategory(id);
         return ResponseEntity.noContent().build();
     }
+
+    @Operation(summary = "Activate a category", description = "Reactivates a previously deactivated category. Requires ADMIN privileges.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Category successfully activated"),
+    })
+    @ApiAdminErrors
+    @ApiNotFound
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/{id}/activate")
+    public ResponseEntity<CategoryResponse> activateCategory(@PathVariable Long id) {
+        return ResponseEntity.ok(categoryService.activateCategory(id));
+    }
 }

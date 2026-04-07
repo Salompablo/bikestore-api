@@ -41,7 +41,8 @@ public class ProductMapper {
                         product.getCategory().getId(),
                         product.getCategory().getName(),
                         product.getCategory().getDescription(),
-                        product.getCategory().getDefaultImageUrl()
+                        product.getCategory().getDefaultImageUrl(),
+                        product.getCategory().getIsActive()
                 ),
                 product.getImages(),
                 product.getIsActive(),
