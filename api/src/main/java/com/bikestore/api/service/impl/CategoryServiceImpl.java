@@ -80,6 +80,20 @@ public class CategoryServiceImpl implements CategoryService {
         categoryRepository.save(category);
     }
 
+    @Override
+    @Transactional
+    public CategoryResponse activateCategory(Long id) {
+        Category category = getCategoryEntityById(id);
+
+        if (Boolean.TRUE.equals(category.getIsActive())) {
+            throw new ConflictException("Category with id: " + id + " is already active.");
+        }
+
+        category.setIsActive(true);
+        Category activatedCategory = categoryRepository.save(category);
+        return categoryMapper.toResponse(activatedCategory);
+    }
+
     private Category getCategoryEntityById(Long id) {
         return categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));

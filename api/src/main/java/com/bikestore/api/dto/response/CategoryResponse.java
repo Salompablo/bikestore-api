@@ -14,6 +14,9 @@ public record CategoryResponse(
         String description,
 
         @Schema(description = "Default image URL for products without images", example = "https://bucket.s3.amazonaws.com/categories/mountain-bikes.jpg")
-        String defaultImageUrl
+        String defaultImageUrl,
+
+        @Schema(description = "Indicates if the category is active", example = "true")
+        Boolean isActive
 ) {
 }
