@@ -52,6 +52,12 @@ public class ProductServiceImpl implements ProductService {
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.categoryId()));
 
+        if (!Boolean.TRUE.equals(category.getIsActive())) {
+            throw new ConflictException(
+                    "Cannot assign product to inactive category with id: " + category.getId() +
+                    ". Reactivate the category first or choose an active category.");
+        }
+
         Product product = productMapper.toEntity(request, category);
         return productMapper.toResponse(productRepository.save(product));
     }
@@ -67,6 +73,12 @@ public class ProductServiceImpl implements ProductService {
         }
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.categoryId()));
+
+        if (!Boolean.TRUE.equals(category.getIsActive())) {
+            throw new ConflictException(
+                    "Cannot assign product to inactive category with id: " + category.getId() +
+                    ". Reactivate the category first or choose an active category.");
+        }
 
         productMapper.updateProductFromRequest(existingProduct, request, category);
         return productMapper.toResponse(productRepository.save(existingProduct));

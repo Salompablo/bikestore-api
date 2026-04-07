@@ -3,9 +3,11 @@ package com.bikestore.api.service.impl;
 import com.bikestore.api.dto.request.CategoryRequest;
 import com.bikestore.api.dto.response.CategoryResponse;
 import com.bikestore.api.entity.Category;
+import com.bikestore.api.exception.ConflictException;
 import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.mapper.CategoryMapper;
 import com.bikestore.api.repository.CategoryRepository;
+import com.bikestore.api.repository.ProductRepository;
 import com.bikestore.api.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,11 +21,20 @@ public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final CategoryMapper categoryMapper;
+    private final ProductRepository productRepository;
 
     @Override
     @Transactional(readOnly = true)
     public List<CategoryResponse> getAllCategories() {
         return categoryRepository.findAll().stream()
+                .map(categoryMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CategoryResponse> getActiveCategories() {
+        return categoryRepository.findByIsActiveTrue().stream()
                 .map(categoryMapper::toResponse)
                 .toList();
     }
@@ -58,7 +69,15 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     public void deleteCategory(Long id) {
         Category category = getCategoryEntityById(id);
-        categoryRepository.delete(category);
+
+        if (productRepository.existsByCategoryIdAndIsActiveTrue(id)) {
+            throw new ConflictException(
+                    "Cannot deactivate category with id: " + id +
+                    " because it has active products. Deactivate its products first.");
+        }
+
+        category.setIsActive(false);
+        categoryRepository.save(category);
     }
 
     private Category getCategoryEntityById(Long id) {

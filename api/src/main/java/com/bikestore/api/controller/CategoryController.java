@@ -29,11 +29,20 @@ public class CategoryController {
 
     private final CategoryService categoryService;
 
-    @Operation(summary = "Get all categories", description = "Retrieves a list of all available product categories.")
+    @Operation(summary = "Get all categories", description = "Retrieves a list of all product categories (including inactive). Requires ADMIN privileges.")
     @ApiResponse(responseCode = "200", description = "Successfully retrieved categories")
+    @ApiAdminErrors
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public ResponseEntity<List<CategoryResponse>> getAllCategories() {
         return ResponseEntity.ok(categoryService.getAllCategories());
+    }
+
+    @Operation(summary = "Get active categories", description = "Retrieves a list of active product categories.")
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved active categories")
+    @GetMapping("/active")
+    public ResponseEntity<List<CategoryResponse>> getActiveCategories() {
+        return ResponseEntity.ok(categoryService.getActiveCategories());
     }
 
     @Operation(summary = "Get category by ID", description = "Retrieves details of a specific category.")
