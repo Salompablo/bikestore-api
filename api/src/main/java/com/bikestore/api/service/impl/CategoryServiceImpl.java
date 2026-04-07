@@ -72,7 +72,7 @@ public class CategoryServiceImpl implements CategoryService {
 
         if (productRepository.existsByCategoryIdAndIsActiveTrue(id)) {
             throw new ConflictException(
-                    "Cannot deactivate category with id: " + id +
+                    "Cannot delete category with id: " + id +
                     " because it has active products. Deactivate its products first.");
         }
 
