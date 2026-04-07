@@ -92,6 +92,7 @@ public class CategoryController {
     @Operation(summary = "Activate a category", description = "Reactivates a previously deactivated category. Requires ADMIN privileges.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Category successfully activated"),
+            @ApiResponse(responseCode = "409", description = "Category is already active", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
     })
     @ApiAdminErrors
     @ApiNotFound

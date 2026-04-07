@@ -100,7 +100,8 @@ public class ProductController {
     @Operation(summary = "Activate a product", description = "Reactivates a previously deactivated product. Requires ADMIN privileges.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Product successfully activated"),
-            @ApiResponse(responseCode = "403", description = "Access denied (Not an Admin)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "403", description = "Access denied (Not an Admin)", content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "Product is already active or its category is inactive", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @ApiNotFound
     @PreAuthorize("hasRole('ADMIN')")
