@@ -39,22 +39,18 @@ public record ProductRequest(
         List<String> images,
 
         @Schema(description = "Weight in kilograms", example = "14.5")
-        @NotNull(message = "Weight is required")
         @Min(0)
         Double weight,
 
         @Schema(description = "Length in centimeters", example = "180.0")
-        @NotNull(message = "Length is required")
         @Min(0)
         Double length,
 
         @Schema(description = "Width in centimeters", example = "20.0")
-        @NotNull(message = "Width is required")
         @Min(0)
         Double width,
 
         @Schema(description = "Height in centimeters", example = "105.0")
-        @NotNull(message = "Height is required")
         @Min(0)
         Double height
 ) {
