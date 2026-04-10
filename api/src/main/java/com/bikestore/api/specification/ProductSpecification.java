@@ -31,7 +31,7 @@ public final class ProductSpecification {
         return (root, query, cb) -> cb.lessThanOrEqualTo(root.get("price"), maxPrice);
     }
 
-    public static Specification<Product> inStock() {
+    public static Specification<Product> hasStock() {
         return (root, query, cb) -> cb.greaterThan(root.get("stock"), 0);
     }
 
@@ -61,7 +61,7 @@ public final class ProductSpecification {
             spec = spec.and(priceLessThanOrEqual(maxPrice));
         }
         if (Boolean.TRUE.equals(inStock)) {
-            spec = spec.and(inStock());
+            spec = spec.and(hasStock());
         }
 
         return spec;
