@@ -31,6 +31,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             Pageable pageable
     );
 
+    @Query("SELECT p FROM Product p " +
+            "WHERE (:categoryId IS NULL OR p.category.id = :categoryId) " +
+            "AND LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))")
+    Page<Product> searchAllProducts(
+            @Param("categoryId") Long categoryId,
+            @Param("search") String search,
+            Pageable pageable
+    );
+
     @Modifying
     @Query("UPDATE Product p SET p.stock = p.stock + :quantity WHERE p.id = :productId")
     int restoreStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);

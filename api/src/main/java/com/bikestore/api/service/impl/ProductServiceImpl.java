@@ -27,10 +27,21 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public Page<ProductResponse> getActiveProducts(Long categoryId, String search, Pageable pageable) {
+        return searchProducts(categoryId, search, pageable, false);
+    }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductResponse> getAllProducts(Long categoryId, String search, Pageable pageable) {
+        return searchProducts(categoryId, search, pageable, true);
+    }
+
+    private Page<ProductResponse> searchProducts(Long categoryId, String search, Pageable pageable, boolean includeInactive) {
         String safeSearch = (search == null) ? "" : search;
 
-        Page<Product> productPage = productRepository.searchActiveProducts(categoryId, safeSearch, pageable);
+        Page<Product> productPage = includeInactive
+                ? productRepository.searchAllProducts(categoryId, safeSearch, pageable)
+                : productRepository.searchActiveProducts(categoryId, safeSearch, pageable);
 
         return productPage.map(productMapper::toResponse);
     }
