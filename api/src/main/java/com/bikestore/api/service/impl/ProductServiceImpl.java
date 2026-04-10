@@ -10,11 +10,15 @@ import com.bikestore.api.mapper.ProductMapper;
 import com.bikestore.api.repository.CategoryRepository;
 import com.bikestore.api.repository.ProductRepository;
 import com.bikestore.api.service.ProductService;
+import com.bikestore.api.specification.ProductSpecification;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -26,24 +30,16 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ProductResponse> getActiveProducts(Long categoryId, String search, Pageable pageable) {
-        return searchProducts(categoryId, search, pageable, false);
+    public Page<ProductResponse> getActiveProducts(Long categoryId, String search, BigDecimal minPrice, BigDecimal maxPrice, Boolean inStock, Pageable pageable) {
+        Specification<Product> spec = ProductSpecification.buildCatalogSpec(categoryId, search, minPrice, maxPrice, inStock, true);
+        return productRepository.findAll(spec, pageable).map(productMapper::toResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ProductResponse> getAllProducts(Long categoryId, String search, Pageable pageable) {
-        return searchProducts(categoryId, search, pageable, true);
-    }
-
-    private Page<ProductResponse> searchProducts(Long categoryId, String search, Pageable pageable, boolean includeInactive) {
-        String safeSearch = (search == null) ? "" : search;
-
-        Page<Product> productPage = includeInactive
-                ? productRepository.searchAllProducts(categoryId, safeSearch, pageable)
-                : productRepository.searchActiveProducts(categoryId, safeSearch, pageable);
-
-        return productPage.map(productMapper::toResponse);
+    public Page<ProductResponse> getAllProducts(Long categoryId, String search, BigDecimal minPrice, BigDecimal maxPrice, Boolean inStock, Pageable pageable) {
+        Specification<Product> spec = ProductSpecification.buildCatalogSpec(categoryId, search, minPrice, maxPrice, inStock, false);
+        return productRepository.findAll(spec, pageable).map(productMapper::toResponse);
     }
 
     @Override
