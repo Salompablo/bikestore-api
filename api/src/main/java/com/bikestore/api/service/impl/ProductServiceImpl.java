@@ -37,6 +37,17 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
+    public Page<ProductResponse> getAllProducts(Long categoryId, String search, Pageable pageable) {
+
+        String safeSearch = (search == null) ? "" : search;
+
+        Page<Product> productPage = productRepository.searchAllProducts(categoryId, safeSearch, pageable);
+
+        return productPage.map(productMapper::toResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ProductResponse getById(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));

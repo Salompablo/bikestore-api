@@ -49,6 +49,28 @@ public class ProductController {
         return ResponseEntity.ok(PageResponse.of(springPage));
     }
 
+    @Operation(summary = "Get all products (admin)", description = "Retrieves a paginated list of all products, including active and inactive ones. Requires ADMIN privileges.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved all products"),
+            @ApiResponse(responseCode = "403", description = "Access denied (Not an Admin)", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin")
+    public ResponseEntity<PageResponse<ProductResponse>> getAllProducts(
+            @Parameter(description = "Optional category ID to filter by", example = "1")
+            @RequestParam(required = false) Long categoryId,
+
+            @Parameter(description = "Optional search query for product name", example = "Trek")
+            @RequestParam(required = false) String search,
+
+            @Parameter(hidden = true)
+            @PageableDefault(size = 10, sort = "name") Pageable pageable) {
+
+        Page<ProductResponse> springPage = productService.getAllProducts(categoryId, search, pageable);
+
+        return ResponseEntity.ok(PageResponse.of(springPage));
+    }
+
     @Operation(summary = "Get product by ID", description = "Retrieves detailed information about a specific product.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Product found"),
