@@ -68,25 +68,10 @@ public class ProductController {
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/admin")
     public ResponseEntity<PageResponse<ProductResponse>> getAllProducts(
-            @Parameter(description = "Optional category ID to filter by", example = "1")
-            @RequestParam(required = false) Long categoryId,
-
-            @Parameter(description = "Optional search query for product name", example = "Trek")
-            @RequestParam(required = false) String search,
-
-            @Parameter(description = "Optional minimum price filter", example = "100000")
-            @RequestParam(required = false) BigDecimal minPrice,
-
-            @Parameter(description = "Optional maximum price filter", example = "500000")
-            @RequestParam(required = false) BigDecimal maxPrice,
-
-            @Parameter(description = "Optional filter for products in stock (stock > 0)", example = "true")
-            @RequestParam(required = false) Boolean inStock,
-
             @Parameter(hidden = true)
             @PageableDefault(size = 12, sort = "name") Pageable pageable) {
 
-        Page<ProductResponse> springPage = productService.getAllProducts(categoryId, search, minPrice, maxPrice, inStock, pageable);
+        Page<ProductResponse> springPage = productService.getAllProducts(pageable);
 
         return ResponseEntity.ok(PageResponse.of(springPage));
     }
