@@ -43,7 +43,7 @@ public final class ProductSpecification {
             Boolean inStock,
             boolean activeOnly) {
 
-        Specification<Product> spec = Specification.where((Specification<Product>) null);
+        Specification<Product> spec = (root, query, cb) -> cb.conjunction();
 
         if (activeOnly) {
             spec = spec.and(isActive());
