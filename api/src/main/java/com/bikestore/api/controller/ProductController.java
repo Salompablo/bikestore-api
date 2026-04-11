@@ -23,6 +23,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
@@ -31,7 +33,7 @@ public class ProductController {
 
     private final ProductService productService;
 
-    @Operation(summary = "Get product catalog", description = "Retrieves a paginated list of active products. Supports optional filtering by category ID and searching by product name.")
+    @Operation(summary = "Get product catalog", description = "Retrieves a paginated list of active products. Supports optional filtering by category, name search, price range, and stock availability.")
     @ApiResponse(responseCode = "200", description = "Successfully retrieved catalog")
     @GetMapping
     public ResponseEntity<PageResponse<ProductResponse>> getCatalog(
@@ -41,10 +43,19 @@ public class ProductController {
             @Parameter(description = "Optional search query for product name", example = "Trek")
             @RequestParam(required = false) String search,
 
-            @Parameter(hidden = true)
-            @PageableDefault(size = 10, sort = "name") Pageable pageable) {
+            @Parameter(description = "Optional minimum price filter", example = "100000")
+            @RequestParam(required = false) BigDecimal minPrice,
 
-        Page<ProductResponse> springPage = productService.getActiveProducts(categoryId, search, pageable);
+            @Parameter(description = "Optional maximum price filter", example = "500000")
+            @RequestParam(required = false) BigDecimal maxPrice,
+
+            @Parameter(description = "Optional filter for products in stock (stock > 0)", example = "true")
+            @RequestParam(required = false) Boolean inStock,
+
+            @Parameter(hidden = true)
+            @PageableDefault(size = 12, sort = "name") Pageable pageable) {
+
+        Page<ProductResponse> springPage = productService.getActiveProducts(categoryId, search, minPrice, maxPrice, inStock, pageable);
 
         return ResponseEntity.ok(PageResponse.of(springPage));
     }
@@ -63,10 +74,19 @@ public class ProductController {
             @Parameter(description = "Optional search query for product name", example = "Trek")
             @RequestParam(required = false) String search,
 
-            @Parameter(hidden = true)
-            @PageableDefault(size = 10, sort = "name") Pageable pageable) {
+            @Parameter(description = "Optional minimum price filter", example = "100000")
+            @RequestParam(required = false) BigDecimal minPrice,
 
-        Page<ProductResponse> springPage = productService.getAllProducts(categoryId, search, pageable);
+            @Parameter(description = "Optional maximum price filter", example = "500000")
+            @RequestParam(required = false) BigDecimal maxPrice,
+
+            @Parameter(description = "Optional filter for products in stock (stock > 0)", example = "true")
+            @RequestParam(required = false) Boolean inStock,
+
+            @Parameter(hidden = true)
+            @PageableDefault(size = 12, sort = "name") Pageable pageable) {
+
+        Page<ProductResponse> springPage = productService.getAllProducts(categoryId, search, minPrice, maxPrice, inStock, pageable);
 
         return ResponseEntity.ok(PageResponse.of(springPage));
     }
