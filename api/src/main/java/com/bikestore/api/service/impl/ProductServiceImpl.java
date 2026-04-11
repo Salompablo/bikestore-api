@@ -37,9 +37,8 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ProductResponse> getAllProducts(Long categoryId, String search, BigDecimal minPrice, BigDecimal maxPrice, Boolean inStock, Pageable pageable) {
-        Specification<Product> spec = ProductSpecification.buildCatalogSpec(categoryId, search, minPrice, maxPrice, inStock, false);
-        return productRepository.findAll(spec, pageable).map(productMapper::toResponse);
+    public Page<ProductResponse> getAllProducts(Pageable pageable) {
+        return productRepository.findAll(pageable).map(productMapper::toResponse);
     }
 
     @Override
