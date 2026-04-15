@@ -45,6 +45,8 @@ public class ProductMapper {
                         product.getCategory().getIsActive()
                 ),
                 product.getImages(),
+                product.getAverageRating(),
+                product.getReviewCount(),
                 product.getIsActive(),
                 product.getWeight(),
                 product.getLength(),

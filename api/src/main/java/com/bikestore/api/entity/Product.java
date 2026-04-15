@@ -64,6 +64,14 @@ public class Product {
     @Builder.Default
     private List<String> images = new ArrayList<>();
 
+    @Column(name = "average_rating", nullable = false)
+    @Builder.Default
+    private Double averageRating = 0.0;
+
+    @Column(name = "review_count", nullable = false)
+    @Builder.Default
+    private Integer reviewCount = 0;
+
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
