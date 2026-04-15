@@ -36,7 +36,7 @@ public class ReviewController {
     public ResponseEntity<PageResponse<ReviewResponse>> getReviewsByProduct(
             @PathVariable Long productId,
             @Parameter(hidden = true)
-            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "createdAt", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(reviewService.getReviewsByProduct(productId, pageable));
     }
 

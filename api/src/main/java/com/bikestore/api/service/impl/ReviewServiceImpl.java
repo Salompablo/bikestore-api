@@ -22,8 +22,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
 @Service
 @RequiredArgsConstructor
 public class ReviewServiceImpl implements ReviewService {
@@ -110,19 +108,11 @@ public class ReviewServiceImpl implements ReviewService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
 
-        List<Review> reviews = reviewRepository.findByProductId(productId, Pageable.unpaged()).getContent();
+        Double average = reviewRepository.calculateAverageRatingByProductId(productId);
+        Integer count = reviewRepository.countByProductId(productId);
 
-        if (reviews.isEmpty()) {
-            product.setAverageRating(0.0);
-            product.setReviewCount(0);
-        } else {
-            double average = reviews.stream()
-                    .mapToInt(Review::getRating)
-                    .average()
-                    .orElse(0.0);
-            product.setAverageRating(Math.round(average * 10.0) / 10.0);
-            product.setReviewCount(reviews.size());
-        }
+        product.setAverageRating(Math.round(average * 10.0) / 10.0);
+        product.setReviewCount(count);
 
         productRepository.save(product);
     }
