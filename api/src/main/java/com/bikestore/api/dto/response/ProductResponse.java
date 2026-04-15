@@ -31,6 +31,12 @@ public record ProductResponse(
         @Schema(description = "List of S3 image URLs", example = "[\"https://bucket.s3.amazonaws.com/image1.jpg\"]")
         List<String> images,
 
+        @Schema(description = "Average rating from customer reviews", example = "4.5")
+        Double averageRating,
+
+        @Schema(description = "Total number of customer reviews", example = "12")
+        Integer reviewCount,
+
         @Schema(description = "Indicates if the product is active and visible to customers", example = "true")
         Boolean isActive,
 
