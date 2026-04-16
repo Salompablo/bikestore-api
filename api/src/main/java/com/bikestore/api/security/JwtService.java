@@ -1,5 +1,6 @@
 package com.bikestore.api.security;
 
+import com.bikestore.api.entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -31,6 +32,11 @@ public class JwtService {
                 .map(GrantedAuthority::getAuthority)
                 .orElseThrow(() -> new IllegalStateException("User has no assigned role"));
         extraClaims.put("role", role);
+
+        if (userDetails instanceof User user) {
+            extraClaims.put("userId", user.getId());
+        }
+
         return buildToken(extraClaims, userDetails, jwtExpiration);
     }
 
