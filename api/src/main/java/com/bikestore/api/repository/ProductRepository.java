@@ -34,24 +34,6 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     @Query("UPDATE Product p SET p.stock = p.stock - :quantity WHERE p.id = :productId AND p.stock >= :quantity")
     int deductStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 
-    @Query("SELECT p FROM Product p WHERE p.isActive = true " +
-            "AND (:categoryId IS NULL OR p.category.id = :categoryId) " +
-            "AND LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))")
-    Page<Product> searchActiveProducts(
-            @Param("categoryId") Long categoryId,
-            @Param("search") String search,
-            Pageable pageable
-    );
-
-    @Query("SELECT p FROM Product p " +
-            "WHERE (:categoryId IS NULL OR p.category.id = :categoryId) " +
-            "AND LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))")
-    Page<Product> searchAllProducts(
-            @Param("categoryId") Long categoryId,
-            @Param("search") String search,
-            Pageable pageable
-    );
-
     @Modifying
     @Query("UPDATE Product p SET p.stock = p.stock + :quantity WHERE p.id = :productId")
     int restoreStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);

@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -50,6 +51,7 @@ public class ReviewController {
             @ApiResponse(responseCode = "409", description = "User already has a review for this product", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping("/api/v1/reviews")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ReviewResponse> createReview(
             @Valid @RequestBody ReviewRequest request,
             @Parameter(hidden = true) @AuthenticationPrincipal User authenticatedUser) {
@@ -64,6 +66,7 @@ public class ReviewController {
             @ApiResponse(responseCode = "404", description = "Review not found", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PatchMapping("/api/v1/reviews/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ReviewResponse> updateReview(
             @PathVariable Long id,
             @Valid @RequestBody ReviewRequest request,
@@ -78,6 +81,7 @@ public class ReviewController {
             @ApiResponse(responseCode = "404", description = "Review not found", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/api/v1/reviews/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> deleteReview(
             @PathVariable Long id,
             @Parameter(hidden = true) @AuthenticationPrincipal User authenticatedUser) {
