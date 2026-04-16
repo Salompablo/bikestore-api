@@ -1,5 +1,6 @@
 package com.bikestore.api.dto.request;
 
+import com.bikestore.api.entity.enums.DeliveryMethod;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -16,14 +17,17 @@ public record CheckoutRequest(
         @Valid
         List<CartItemRequest> items,
 
-        @Schema(description = "Shipping address for delivery", example = "Av. Colón 1234, Mar del Plata")
+        @Schema(description = "Delivery method chosen by the buyer", example = "STORE_PICKUP")
+        @NotNull(message = "Delivery method is required (STORE_PICKUP or SHIPPING)")
+        DeliveryMethod deliveryMethod,
+
+        @Schema(description = "Shipping address for delivery (required when deliveryMethod is SHIPPING)", example = "Av. Colón 1234, Mar del Plata")
         String shippingAddress,
 
-        @Schema(description = "Postal or ZIP code", example = "7600")
+        @Schema(description = "Postal or ZIP code (required when deliveryMethod is SHIPPING)", example = "7600")
         String zipCode,
 
-        @Schema(description = "Calculated shipping cost (0 if picking up at store)", example = "15000.00")
-        @NotNull(message = "Shipping cost is required. Send 0 for store pickup.")
+        @Schema(description = "Calculated shipping cost (required when deliveryMethod is SHIPPING, ignored for STORE_PICKUP)", example = "15000.00")
         @Min(value = 0, message = "Shipping cost cannot be negative")
         BigDecimal shippingCost
 ) {

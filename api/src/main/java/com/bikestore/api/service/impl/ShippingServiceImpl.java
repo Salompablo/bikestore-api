@@ -14,7 +14,7 @@ public class ShippingServiceImpl implements ShippingService {
 
         BigDecimal cost;
         int estimatedDays;
-        String provider = "Logística Bikes Asaro (Simulado)";
+        String provider = "Envío gestionado por Bikes Asaro";
 
         if (zipCode.startsWith("7600")) {
             cost = new BigDecimal("2500.00");
@@ -22,11 +22,9 @@ public class ShippingServiceImpl implements ShippingService {
         } else if (zipCode.startsWith("1") || zipCode.startsWith("2") || zipCode.startsWith("B")) {
             cost = new BigDecimal("15000.00");
             estimatedDays = 3;
-            provider = "Andreani (Tarifa plana simulada)";
         } else {
             cost = new BigDecimal("25000.00");
             estimatedDays = 6;
-            provider = "Andreani (Tarifa plana simulada)";
         }
 
         return new ShippingQuoteResponse(provider, cost, estimatedDays);

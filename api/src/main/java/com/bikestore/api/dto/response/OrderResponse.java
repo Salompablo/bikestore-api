@@ -14,6 +14,9 @@ public record OrderResponse(
         @Schema(description = "Current status of the order (e.g., PENDING, PAID, SHIPPED, CANCELLED)", example = "PAID")
         String status,
 
+        @Schema(description = "Delivery method (STORE_PICKUP or SHIPPING)", example = "SHIPPING")
+        String deliveryMethod,
+
         @Schema(description = "Total amount of the order including shipping", example = "1715000.00")
         BigDecimal totalAmount,
 
@@ -23,13 +26,13 @@ public record OrderResponse(
         @Schema(description = "List of items included in this order")
         List<OrderItemResponse> items,
 
-        @Schema(description = "Delivery address", example = "Av. Colón 1234, Mar del Plata")
+        @Schema(description = "Delivery address (null for store pickup)", example = "Av. Colón 1234, Mar del Plata")
         String shippingAddress,
 
-        @Schema(description = "Postal or ZIP code", example = "7600")
+        @Schema(description = "Postal or ZIP code (null for store pickup)", example = "7600")
         String zipCode,
 
-        @Schema(description = "Cost of shipping", example = "15000.00")
+        @Schema(description = "Cost of shipping (0 for store pickup)", example = "15000.00")
         BigDecimal shippingCost,
 
         @Schema(description = "Logistics tracking number", example = "AR-987654321")

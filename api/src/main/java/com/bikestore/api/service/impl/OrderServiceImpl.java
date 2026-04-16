@@ -8,6 +8,7 @@ import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.OrderItem;
 import com.bikestore.api.entity.Product;
 import com.bikestore.api.entity.User;
+import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.entity.enums.OrderStatus;
 import com.bikestore.api.exception.ConflictException;
 import com.bikestore.api.exception.ResourceNotFoundException;
@@ -23,7 +24,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.EnumSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -55,6 +58,8 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
 
+        validateStatusTransition(order, newStatus);
+
         order.setStatus(newStatus);
         Order updatedOrder = orderRepository.save(order);
 
@@ -64,9 +69,24 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public Order createPendingOrder(CheckoutRequest checkoutRequest, User authenticatedUser) {
+        DeliveryMethod deliveryMethod = checkoutRequest.deliveryMethod();
+
+        if (deliveryMethod == DeliveryMethod.SHIPPING) {
+            if (checkoutRequest.shippingAddress() == null || checkoutRequest.shippingAddress().isBlank()) {
+                throw new IllegalArgumentException("Shipping address is required for delivery orders");
+            }
+            if (checkoutRequest.zipCode() == null || checkoutRequest.zipCode().isBlank()) {
+                throw new IllegalArgumentException("ZIP code is required for delivery orders");
+            }
+            if (checkoutRequest.shippingCost() == null || checkoutRequest.shippingCost().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("A valid shipping cost is required for delivery orders");
+            }
+        }
+
         Order order = new Order();
         order.setUser(authenticatedUser);
         order.setStatus(OrderStatus.PENDING);
+        order.setDeliveryMethod(deliveryMethod);
 
         BigDecimal totalAmount = BigDecimal.ZERO;
 
@@ -98,16 +118,16 @@ public class OrderServiceImpl implements OrderService {
             totalAmount = totalAmount.add(product.getPrice().multiply(new BigDecimal(quantity)));
         }
 
-        BigDecimal shippingCost = checkoutRequest.shippingCost() != null ? checkoutRequest.shippingCost() : BigDecimal.ZERO;
-        if (shippingCost.compareTo(BigDecimal.ZERO) > 0) {
+        if (deliveryMethod == DeliveryMethod.SHIPPING) {
+            BigDecimal shippingCost = checkoutRequest.shippingCost();
             order.setShippingCost(shippingCost);
             order.setShippingAddress(checkoutRequest.shippingAddress());
             order.setZipCode(checkoutRequest.zipCode());
             totalAmount = totalAmount.add(shippingCost);
         } else {
             order.setShippingCost(BigDecimal.ZERO);
-            order.setShippingAddress("Retiro en sucursal");
-            order.setZipCode("7600");
+            order.setShippingAddress(null);
+            order.setZipCode(null);
         }
 
         order.setTotalAmount(totalAmount);
@@ -138,5 +158,37 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
 
         log.info("Order {} confirmed as PAID.", orderId);
+    }
+
+    private void validateStatusTransition(Order order, OrderStatus newStatus) {
+        OrderStatus current = order.getStatus();
+        DeliveryMethod method = order.getDeliveryMethod();
+
+        // CANCELLED is always allowed from any state
+        if (newStatus == OrderStatus.CANCELLED) {
+            return;
+        }
+
+        Set<OrderStatus> allowed;
+
+        if (method == DeliveryMethod.STORE_PICKUP) {
+            allowed = switch (current) {
+                case PAID -> EnumSet.of(OrderStatus.READY_FOR_PICKUP);
+                case READY_FOR_PICKUP -> EnumSet.of(OrderStatus.PICKED_UP);
+                default -> EnumSet.noneOf(OrderStatus.class);
+            };
+        } else {
+            allowed = switch (current) {
+                case PAID -> EnumSet.of(OrderStatus.SHIPPED);
+                case SHIPPED -> EnumSet.of(OrderStatus.DELIVERED);
+                default -> EnumSet.noneOf(OrderStatus.class);
+            };
+        }
+
+        if (!allowed.contains(newStatus)) {
+            throw new IllegalArgumentException(
+                    String.format("Cannot transition order %d from %s to %s (delivery method: %s)",
+                            order.getId(), current, newStatus, method));
+        }
     }
 }
