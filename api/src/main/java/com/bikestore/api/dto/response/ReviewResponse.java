@@ -18,6 +18,9 @@ public record ReviewResponse(
         @Schema(description = "Date and time when the review was created")
         LocalDateTime createdAt,
 
+        @Schema(description = "ID of the reviewer", example = "1")
+        Long userId,
+
         @Schema(description = "First name of the reviewer", example = "John")
         String userFirstName,
 
