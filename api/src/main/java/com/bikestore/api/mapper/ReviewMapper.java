@@ -26,7 +26,8 @@ public class ReviewMapper {
                 review.getComment(),
                 review.getCreatedAt(),
                 review.getUser().getFirstName(),
-                review.getUser().getLastName()
+                review.getUser().getLastName(),
+                review.getUser().getEmail()
         );
     }
 }
