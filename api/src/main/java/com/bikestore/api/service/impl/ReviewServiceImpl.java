@@ -12,6 +12,7 @@ import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.mapper.ReviewMapper;
 import com.bikestore.api.repository.ProductRepository;
 import com.bikestore.api.repository.ReviewRepository;
+import com.bikestore.api.service.ProductService;
 import com.bikestore.api.service.ReviewService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -27,6 +28,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewRepository reviewRepository;
     private final ProductRepository productRepository;
     private final ReviewMapper reviewMapper;
+    private final ProductService productService;
 
     @Override
     @Transactional
@@ -42,7 +44,7 @@ public class ReviewServiceImpl implements ReviewService {
         Review review = reviewMapper.toEntity(request, product, authenticatedUser);
         Review saved = reviewRepository.save(review);
 
-        recalculateProductStats(product.getId());
+        productService.recalculateProductStats(product.getId());
 
         return reviewMapper.toResponse(saved);
     }
@@ -61,7 +63,7 @@ public class ReviewServiceImpl implements ReviewService {
         review.setComment(request.comment());
         Review updated = reviewRepository.save(review);
 
-        recalculateProductStats(review.getProduct().getId());
+        productService.recalculateProductStats(review.getProduct().getId());
 
         return reviewMapper.toResponse(updated);
     }
@@ -82,7 +84,7 @@ public class ReviewServiceImpl implements ReviewService {
         Long productId = review.getProduct().getId();
         reviewRepository.delete(review);
 
-        recalculateProductStats(productId);
+        productService.recalculateProductStats(productId);
     }
 
     @Override
@@ -96,18 +98,5 @@ public class ReviewServiceImpl implements ReviewService {
                 .map(reviewMapper::toResponse);
 
         return PageResponse.of(page);
-    }
-
-    private void recalculateProductStats(Long productId) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
-
-        Double average = reviewRepository.calculateAverageRatingByProductId(productId);
-        Integer count = reviewRepository.countByProductId(productId);
-
-        product.setAverageRating(Math.round(average * 10.0) / 10.0);
-        product.setReviewCount(count);
-
-        productRepository.save(product);
     }
 }
