@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -62,10 +63,12 @@ public class WebhookController {
 
             if (xSignature != null && xRequestId != null) {
                 if (!signatureValidator.isValid(xSignature, xRequestId, actualId)) {
-                    log.warn("MP Signature mismatch for ID: {}. Falling back to secure SDK verification.", actualId);
+                    log.warn("MP Signature mismatch for ID: {}. Rejecting webhook.", actualId);
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Invalid signature");
                 }
             } else {
-                log.warn("Webhook missing security headers for ID: {}. Falling back to secure SDK verification.", actualId);
+                log.warn("Webhook missing security headers for ID: {}. Rejecting.", actualId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Missing security headers");
             }
 
             log.info("Processing Payment ID: {}", actualId);
@@ -79,7 +82,7 @@ public class WebhookController {
 
         } catch (Exception e) {
             log.error("Error handling webhook payload", e);
-            return ResponseEntity.ok("Error handled");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing failed");
         }
     }
 }

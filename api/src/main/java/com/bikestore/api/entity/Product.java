@@ -2,6 +2,7 @@ package com.bikestore.api.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -38,7 +39,7 @@ public class Product {
     @Column(nullable = false)
     private Integer stock;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
@@ -58,9 +59,10 @@ public class Product {
     @Builder.Default
     private Double height = 0.0;
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "image_url", length = 512)
+    @BatchSize(size = 20)
     @Builder.Default
     private List<String> images = new ArrayList<>();
 
