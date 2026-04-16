@@ -9,6 +9,7 @@ import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.mapper.ProductMapper;
 import com.bikestore.api.repository.CategoryRepository;
 import com.bikestore.api.repository.ProductRepository;
+import com.bikestore.api.repository.ReviewRepository;
 import com.bikestore.api.service.ProductService;
 import com.bikestore.api.specification.ProductSpecification;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
     private final CategoryRepository categoryRepository;
+    private final ReviewRepository reviewRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -106,6 +108,21 @@ public class ProductServiceImpl implements ProductService {
         product.setIsActive(true);
         Product activatedProduct = productRepository.save(product);
         return productMapper.toResponse(activatedProduct);
+    }
+
+    @Override
+    @Transactional
+    public void recalculateProductStats(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+
+        Double average = reviewRepository.calculateAverageRatingByProductId(productId);
+        Integer count = reviewRepository.countByProductId(productId);
+
+        product.setAverageRating(average != null ? Math.round(average * 10.0) / 10.0 : 0.0);
+        product.setReviewCount(count != null ? count : 0);
+
+        productRepository.save(product);
     }
 
     private void validateCategoryIsActive(Category category) {

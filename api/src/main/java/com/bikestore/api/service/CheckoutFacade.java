@@ -7,6 +7,7 @@ import com.bikestore.api.dto.response.PaymentInfo;
 import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.OrderItem;
 import com.bikestore.api.entity.Product;
+import com.bikestore.api.entity.User;
 import com.bikestore.api.entity.enums.OrderStatus;
 import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.repository.OrderRepository;
@@ -28,8 +29,8 @@ public class CheckoutFacade {
     private final PaymentGatewayService paymentGatewayService;
     private final OrderService orderService;
 
-    public CheckoutResponse initializeCheckout(CheckoutRequest request) {
-        Order order = orderService.createPendingOrder(request);
+    public CheckoutResponse initializeCheckout(CheckoutRequest request, User authenticatedUser) {
+        Order order = orderService.createPendingOrder(request, authenticatedUser);
         CheckoutInfo checkoutInfo = paymentGatewayService.createPreference(order);
         orderService.updateOrderPreference(order.getId(), checkoutInfo.preferenceId());
 

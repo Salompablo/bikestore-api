@@ -15,4 +15,5 @@ public interface ProductService {
     ProductResponse update(Long id, ProductRequest request);
     void delete(Long id);
     ProductResponse activateProduct(Long id);
+    void recalculateProductStats(Long productId);
 }

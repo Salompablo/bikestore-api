@@ -1,6 +1,7 @@
 package com.bikestore.api.specification;
 
 import com.bikestore.api.entity.Product;
+import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
@@ -8,6 +9,15 @@ import java.math.BigDecimal;
 public final class ProductSpecification {
 
     private ProductSpecification() {
+    }
+
+    public static Specification<Product> fetchCategory() {
+        return (root, query, cb) -> {
+            if (query.getResultType() != null && !Number.class.isAssignableFrom(query.getResultType())) {
+                root.fetch("category", JoinType.LEFT);
+            }
+            return cb.conjunction();
+        };
     }
 
     public static Specification<Product> isActive() {
@@ -43,7 +53,7 @@ public final class ProductSpecification {
             Boolean inStock,
             boolean activeOnly) {
 
-        Specification<Product> spec = (root, query, cb) -> cb.conjunction();
+        Specification<Product> spec = fetchCategory();
 
         if (activeOnly) {
             spec = spec.and(isActive());

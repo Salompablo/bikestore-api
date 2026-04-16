@@ -1,5 +1,6 @@
 package com.bikestore.api.entity;
 
+import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.entity.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -31,6 +32,10 @@ public class Order {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_method", nullable = false)
+    private DeliveryMethod deliveryMethod;
 
     @Column(nullable = false)
     private BigDecimal totalAmount;
