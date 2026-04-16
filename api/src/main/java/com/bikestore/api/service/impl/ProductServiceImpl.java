@@ -119,8 +119,8 @@ public class ProductServiceImpl implements ProductService {
         Double average = reviewRepository.calculateAverageRatingByProductId(productId);
         Integer count = reviewRepository.countByProductId(productId);
 
-        product.setAverageRating(Math.round(average * 10.0) / 10.0);
-        product.setReviewCount(count);
+        product.setAverageRating(average != null ? Math.round(average * 10.0) / 10.0 : 0.0);
+        product.setReviewCount(count != null ? count : 0);
 
         productRepository.save(product);
     }

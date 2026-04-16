@@ -13,7 +13,7 @@ public final class ProductSpecification {
 
     public static Specification<Product> fetchCategory() {
         return (root, query, cb) -> {
-            if (Long.class != query.getResultType() && long.class != query.getResultType()) {
+            if (query.getResultType() != null && !Number.class.isAssignableFrom(query.getResultType())) {
                 root.fetch("category", JoinType.LEFT);
             }
             return cb.conjunction();
