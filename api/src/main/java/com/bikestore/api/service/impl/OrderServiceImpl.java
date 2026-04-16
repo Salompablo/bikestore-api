@@ -14,13 +14,11 @@ import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.mapper.OrderMapper;
 import com.bikestore.api.repository.OrderRepository;
 import com.bikestore.api.repository.ProductRepository;
-import com.bikestore.api.repository.UserRepository;
 import com.bikestore.api.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,18 +32,13 @@ import java.util.stream.Collectors;
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
-    private final UserRepository userRepository;
     private final OrderMapper orderMapper;
     private final ProductRepository productRepository;
 
     @Override
     @Transactional(readOnly = true)
-    public Page<OrderResponse> getMyOrders(Pageable pageable) {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        return orderRepository.findByUserId(user.getId(), pageable)
+    public Page<OrderResponse> getMyOrders(User authenticatedUser, Pageable pageable) {
+        return orderRepository.findByUserId(authenticatedUser.getId(), pageable)
                 .map(orderMapper::toOrderResponse);
     }
 
@@ -70,13 +63,9 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public Order createPendingOrder(CheckoutRequest checkoutRequest) {
-        String userEmail = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
+    public Order createPendingOrder(CheckoutRequest checkoutRequest, User authenticatedUser) {
         Order order = new Order();
-        order.setUser(user);
+        order.setUser(authenticatedUser);
         order.setStatus(OrderStatus.PENDING);
 
         BigDecimal totalAmount = BigDecimal.ZERO;
