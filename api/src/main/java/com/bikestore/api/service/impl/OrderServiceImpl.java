@@ -100,14 +100,14 @@ public class OrderServiceImpl implements OrderService {
             Long productId = entry.getKey();
             Integer quantity = entry.getValue();
 
-            Product product = productRepository.findById(productId)
+            Product product = productRepository.findByIdWithLock(productId)
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
-            int updatedRows = productRepository.deductStock(productId, quantity);
-
-            if (updatedRows == 0) {
+            if (product.getStock() < quantity) {
                 throw new ConflictException("Not enough stock remaining for product: " + product.getName());
             }
+
+            productRepository.deductStock(productId, quantity);
 
             OrderItem orderItem = new OrderItem();
             orderItem.setProduct(product);

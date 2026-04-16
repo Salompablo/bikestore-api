@@ -5,6 +5,7 @@ import com.bikestore.api.annotation.ApiPublicErrors;
 import com.bikestore.api.dto.request.*;
 import com.bikestore.api.dto.response.AuthResponse;
 import com.bikestore.api.dto.response.ErrorResponse;
+import com.bikestore.api.dto.response.MessageResponse;
 import com.bikestore.api.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -18,8 +19,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -122,9 +121,9 @@ public class AuthController {
     @ApiNotFound
     @ApiPublicErrors
     @PostMapping("/forgot-password")
-    public ResponseEntity<Map<String, String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         authService.forgotPassword(request);
-        return ResponseEntity.ok(Map.of("message", "If the email exists, a reset code was sent."));
+        return ResponseEntity.ok(new MessageResponse("If the email exists, a reset code was sent."));
     }
 
     @Operation(summary = "Reset password", description = "Sets a new password using the 6-digit reset code.")
@@ -132,8 +131,8 @@ public class AuthController {
     @ApiNotFound
     @ApiPublicErrors
     @PostMapping("/reset-password")
-    public ResponseEntity<Map<String, String>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
-        return ResponseEntity.ok(Map.of("message", "Password has been successfully reset."));
+        return ResponseEntity.ok(new MessageResponse("Password has been successfully reset."));
     }
 }

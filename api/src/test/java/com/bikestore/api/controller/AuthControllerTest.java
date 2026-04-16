@@ -2,6 +2,7 @@ package com.bikestore.api.controller;
 
 import com.bikestore.api.dto.request.*;
 import com.bikestore.api.dto.response.AuthResponse;
+import com.bikestore.api.dto.response.MessageResponse;
 import com.bikestore.api.service.AuthService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -12,8 +13,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -239,11 +238,11 @@ class AuthControllerTest {
 
             doNothing().when(authService).forgotPassword(request);
 
-            ResponseEntity<Map<String, String>> response = authController.forgotPassword(request);
+            ResponseEntity<MessageResponse> response = authController.forgotPassword(request);
 
             assertEquals(HttpStatus.OK, response.getStatusCode());
             assertNotNull(response.getBody());
-            assertEquals("If the email exists, a reset code was sent.", response.getBody().get("message"));
+            assertEquals("If the email exists, a reset code was sent.", response.getBody().message());
             verify(authService).forgotPassword(request);
         }
 
@@ -270,11 +269,11 @@ class AuthControllerTest {
 
             doNothing().when(authService).resetPassword(request);
 
-            ResponseEntity<Map<String, String>> response = authController.resetPassword(request);
+            ResponseEntity<MessageResponse> response = authController.resetPassword(request);
 
             assertEquals(HttpStatus.OK, response.getStatusCode());
             assertNotNull(response.getBody());
-            assertEquals("Password has been successfully reset.", response.getBody().get("message"));
+            assertEquals("Password has been successfully reset.", response.getBody().message());
             verify(authService).resetPassword(request);
         }
 

@@ -78,4 +78,17 @@ public class User implements UserDetails {
     @Override
     public boolean isEnabled() { return this.isActive && this.isEmailVerified; }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        User that = (User) o;
+        return id != null && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
+
 }
