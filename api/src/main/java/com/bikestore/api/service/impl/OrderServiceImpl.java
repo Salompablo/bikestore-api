@@ -100,7 +100,7 @@ public class OrderServiceImpl implements OrderService {
             Long productId = entry.getKey();
             Integer quantity = entry.getValue();
 
-            Product product = productRepository.findById(productId)
+            Product product = productRepository.findByIdWithLock(productId)
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
             int updatedRows = productRepository.deductStock(productId, quantity);

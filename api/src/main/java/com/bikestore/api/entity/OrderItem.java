@@ -31,4 +31,17 @@ public class OrderItem {
 
     @Column(nullable = false)
     private BigDecimal unitPrice;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        OrderItem that = (OrderItem) o;
+        return id != null && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
 }

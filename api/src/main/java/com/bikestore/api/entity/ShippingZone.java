@@ -3,36 +3,42 @@ package com.bikestore.api.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Entity
-@Table(name = "verification_tokens")
+@Table(name = "shipping_zones")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class VerificationToken {
+public class ShippingZone {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String token;
+    @Column(nullable = false)
+    private String name;
 
-    @OneToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "zip_prefix", nullable = false)
+    private String zipPrefix;
 
     @Column(nullable = false)
-    private LocalDateTime expiresAt;
+    private BigDecimal cost;
+
+    @Column(name = "estimated_days", nullable = false)
+    private Integer estimatedDays;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private String provider = "Envío gestionado por Bikes Asaro";
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        VerificationToken that = (VerificationToken) o;
+        ShippingZone that = (ShippingZone) o;
         return id != null && id.equals(that.id);
     }
 

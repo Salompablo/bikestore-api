@@ -1,6 +1,7 @@
 package com.bikestore.api.mapper;
 
 import com.bikestore.api.dto.request.RegisterRequest;
+import com.bikestore.api.dto.response.UserPublicResponse;
 import com.bikestore.api.dto.response.UserResponse;
 import com.bikestore.api.entity.User;
 import com.bikestore.api.entity.enums.AuthProvider;
@@ -45,6 +46,18 @@ public class UserMapper {
                 user.getIsActive(),
                 user.getIsEmailVerified(),
                 user.getProvider() != null ? user.getProvider().name() : null
+        );
+    }
+
+    public UserPublicResponse toPublicResponse(User user) {
+        if (user == null) {
+            return null;
+        }
+        return new UserPublicResponse(
+                user.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getRole() != null ? user.getRole().name() : null
         );
     }
 }

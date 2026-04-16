@@ -1,32 +1,39 @@
 package com.bikestore.api.service.impl;
 
 import com.bikestore.api.dto.response.ShippingQuoteResponse;
+import com.bikestore.api.entity.ShippingZone;
+import com.bikestore.api.repository.ShippingZoneRepository;
 import com.bikestore.api.service.ShippingService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class ShippingServiceImpl implements ShippingService {
 
+    private final ShippingZoneRepository shippingZoneRepository;
+
     @Override
+    @Transactional(readOnly = true)
     public ShippingQuoteResponse calculateShippingCost(String zipCode, Double totalWeight) {
 
-        BigDecimal cost;
-        int estimatedDays;
-        String provider = "Envío gestionado por Bikes Asaro";
+        List<ShippingZone> zones = shippingZoneRepository.findAllOrderByZipPrefixLengthDesc();
 
-        if (zipCode.startsWith("7600")) {
-            cost = new BigDecimal("2500.00");
-            estimatedDays = 1;
-        } else if (zipCode.startsWith("1") || zipCode.startsWith("2") || zipCode.startsWith("B")) {
-            cost = new BigDecimal("15000.00");
-            estimatedDays = 3;
-        } else {
-            cost = new BigDecimal("25000.00");
-            estimatedDays = 6;
+        for (ShippingZone zone : zones) {
+            if (zipCode.startsWith(zone.getZipPrefix())) {
+                return new ShippingQuoteResponse(zone.getProvider(), zone.getCost(), zone.getEstimatedDays());
+            }
         }
 
-        return new ShippingQuoteResponse(provider, cost, estimatedDays);
+        // Default fallback when no zone matches
+        return new ShippingQuoteResponse(
+                "Envío gestionado por Bikes Asaro",
+                new BigDecimal("25000.00"),
+                7
+        );
     }
 }

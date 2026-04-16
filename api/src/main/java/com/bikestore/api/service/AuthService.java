@@ -6,6 +6,7 @@ import com.bikestore.api.dto.request.RegisterRequest;
 import com.bikestore.api.dto.request.ResetPasswordRequest;
 import com.bikestore.api.dto.response.AuthResponse;
 import com.bikestore.api.entity.User;
+import com.bikestore.api.event.SendEmailEvent;
 import com.bikestore.api.exception.AccountDeactivatedException;
 import com.bikestore.api.exception.ConflictException;
 import com.bikestore.api.exception.ResourceNotFoundException;
@@ -14,11 +15,9 @@ import com.bikestore.api.repository.UserRepository;
 import com.bikestore.api.security.JwtService;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -27,7 +26,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.Random;
 
 @Service
@@ -39,12 +37,10 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
-    private final EmailService emailService;
     private final UserMapper userMapper;
     private final VerificationTokenService tokenService;
-
-    @Value("${google.client.id}")
-    private String googleClientId;
+    private final GoogleIdTokenVerifier googleIdTokenVerifier;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -58,7 +54,7 @@ public class AuthService {
 
         String verificationCode = tokenService.generateAndSaveVerificationToken(user);
 
-        emailService.sendVerificationEmail(user.getEmail(), verificationCode);
+        eventPublisher.publishEvent(new SendEmailEvent(this, user.getEmail(), verificationCode, SendEmailEvent.EmailType.VERIFICATION));
         log.info("⚙️ DEV MODE - Verification code for {}: {}", user.getEmail(), verificationCode);
 
         return new AuthResponse("", "User registered successfully. Please check your email for the verification code.");
@@ -88,11 +84,7 @@ public class AuthService {
     public AuthResponse loginWithGoogle(String googleToken) {
 
         try {
-            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
-                    .setAudience(Collections.singletonList(googleClientId))
-                    .build();
-
-            GoogleIdToken idToken = verifier.verify(googleToken);
+            GoogleIdToken idToken = googleIdTokenVerifier.verify(googleToken);
             if (idToken == null) {
                 throw new IllegalArgumentException("Invalid Google token");
             }
@@ -144,7 +136,7 @@ public class AuthService {
 
         String reactivationCode = tokenService.generateAndSaveVerificationToken(user);
 
-        emailService.sendReactivationEmail(user.getEmail(), reactivationCode);
+        eventPublisher.publishEvent(new SendEmailEvent(this, user.getEmail(), reactivationCode, SendEmailEvent.EmailType.REACTIVATION));
     }
 
     @Transactional
@@ -173,7 +165,7 @@ public class AuthService {
         user.setResetPasswordExpiresAt(LocalDateTime.now().plusMinutes(15));
         userRepository.save(user);
 
-        emailService.sendPasswordResetEmail(user.getEmail(), resetCode);
+        eventPublisher.publishEvent(new SendEmailEvent(this, user.getEmail(), resetCode, SendEmailEvent.EmailType.PASSWORD_RESET));
     }
 
     @Transactional

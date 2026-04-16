@@ -22,9 +22,6 @@ public record ReviewResponse(
         String userFirstName,
 
         @Schema(description = "Last name of the reviewer", example = "Doe")
-        String userLastName,
-
-        @Schema(description = "Email of the reviewer", example = "johndoe@gmail.com")
-        String userEmail
+        String userLastName
 ) {
 }
