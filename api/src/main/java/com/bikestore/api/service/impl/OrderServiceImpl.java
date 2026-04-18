@@ -106,7 +106,7 @@ public class OrderServiceImpl implements OrderService {
             int updatedRows = productRepository.deductStock(productId, quantity);
 
             if (updatedRows == 0) {
-                throw new ConflictException("No hay stock suficiente para: " + product.getName());
+                throw new ConflictException("Not enough stock for: " + product.getName());
             }
 
             OrderItem orderItem = new OrderItem();
