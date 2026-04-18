@@ -6,6 +6,7 @@ import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.OrderItem;
 import com.bikestore.api.service.PaymentGatewayService;
 import com.mercadopago.client.payment.PaymentClient;
+import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
 import com.mercadopago.client.preference.PreferenceClient;
 import com.mercadopago.client.preference.PreferenceItemRequest;
 import com.mercadopago.client.preference.PreferenceRequest;
@@ -25,6 +26,9 @@ public class MercadoPagoServiceImpl implements PaymentGatewayService {
 
     @Value("${mercadopago.notification-url}")
     private String notificationUrl;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     @Override
     public CheckoutInfo createPreference(Order order) {
@@ -50,9 +54,16 @@ public class MercadoPagoServiceImpl implements PaymentGatewayService {
                         .build());
             }
 
+            PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
+                    .success(frontendUrl + "/checkout/success")
+                    .failure(frontendUrl + "/checkout/failure")
+                    .pending(frontendUrl + "/checkout/pending")
+                    .build();
+
             PreferenceClient client = new PreferenceClient();
             PreferenceRequest request = PreferenceRequest.builder()
                     .items(mpItems)
+                    .backUrls(backUrls)
                     .externalReference(order.getId().toString())
                     .notificationUrl(notificationUrl)
                     .build();
