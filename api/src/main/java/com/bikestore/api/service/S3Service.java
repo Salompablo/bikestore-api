@@ -22,6 +22,9 @@ public class S3Service {
     @Value("${aws.s3.bucket.name}")
     private String bucketName;
 
+    @Value("${aws.region}")
+    private String region;
+
     public String uploadFile(MultipartFile file) {
         try {
             String originalFilename = file.getOriginalFilename();
@@ -42,7 +45,7 @@ public class S3Service {
 
             log.info("File uploaded successfully to S3: {}", uniqueFilename);
 
-            return "https://" + bucketName + ".s3.amazonaws.com/" + uniqueFilename;
+            return "https://" + bucketName + ".s3." + region + ".amazonaws.com/" + uniqueFilename;
 
         } catch (IOException e) {
             log.error("Failed to read the file before uploading to S3", e);
