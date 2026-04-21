@@ -2,6 +2,7 @@ package com.bikestore.api.entity;
 
 import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.entity.enums.OrderStatus;
+import com.bikestore.api.entity.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -42,6 +43,14 @@ public class Order {
 
     @Column(name = "preference_id")
     private String preferenceId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", nullable = false)
+    @Builder.Default
+    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
+
+    @Column(name = "idempotency_key", unique = true)
+    private String idempotencyKey;
 
     @Column(name = "shipping_address")
     private String shippingAddress;

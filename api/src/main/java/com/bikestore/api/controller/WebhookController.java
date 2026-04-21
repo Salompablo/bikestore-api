@@ -75,7 +75,7 @@ public class WebhookController {
 
             if ("payment".equals(type) || "payment".equals(topic)) {
                 Long paymentId = Long.valueOf(actualId);
-                checkoutFacade.processWebHook(paymentId);
+                checkoutFacade.processWebHook(paymentId, xRequestId);
             }
 
             return ResponseEntity.ok("OK");

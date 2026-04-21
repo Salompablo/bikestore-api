@@ -1,12 +1,17 @@
 package com.bikestore.api.service;
 
 import com.bikestore.api.entity.Order;
-import com.bikestore.api.entity.OrderItem;
+import com.bikestore.api.entity.StockReservation;
 import com.bikestore.api.entity.enums.OrderStatus;
+import com.bikestore.api.entity.enums.ReservationStatus;
+import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.repository.OrderRepository;
 import com.bikestore.api.repository.ProductRepository;
+import com.bikestore.api.repository.StockReservationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,30 +26,62 @@ public class OrderCleanupService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final StockReservationRepository stockReservationRepository;
 
-    @Scheduled(cron = "0 */5 * * * *")
-    @Transactional
+    /**
+     * Self-reference injected lazily to allow {@link #expireReservation(Long)} to be invoked
+     * through the Spring proxy, enabling its {@code @Transactional} to take effect even when
+     * called from within the same class (self-invocation).
+     */
+    @Lazy
+    @Autowired
+    private OrderCleanupService self;
+
+    @Scheduled(fixedRate = 60_000)
     public void releaseExpiredReservations() {
-        LocalDateTime expirationThreshold = LocalDateTime.now().minusMinutes(15);
+        List<Long> expiredIds = stockReservationRepository
+                .findByStatusAndExpiresAtBefore(ReservationStatus.ACTIVE, LocalDateTime.now())
+                .stream()
+                .map(StockReservation::getId)
+                .toList();
 
-        List<Order> expiredOrders = orderRepository.findByStatusAndCreatedAtBefore(
-                OrderStatus.PENDING, expirationThreshold);
-
-        if (expiredOrders.isEmpty()) {
+        if (expiredIds.isEmpty()) {
             return;
         }
 
-        log.info("Found {} expired PENDING orders. Releasing inventory reservations...", expiredOrders.size());
+        log.info("Found {} expired ACTIVE reservation(s). Processing...", expiredIds.size());
 
-        for (Order order : expiredOrders) {
-            for (OrderItem item : order.getItems()) {
-                productRepository.restoreStock(item.getProduct().getId(), item.getQuantity());
+        for (Long reservationId : expiredIds) {
+            try {
+                self.expireReservation(reservationId);
+            } catch (Exception e) {
+                log.error("Failed to expire reservation id={}. Skipping.", reservationId, e);
             }
+        }
+    }
 
+    @Transactional
+    public void expireReservation(Long reservationId) {
+        StockReservation reservation = stockReservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + reservationId));
+
+        Long productId = reservation.getProduct().getId();
+        Integer quantity = reservation.getQuantity();
+
+        int updated = productRepository.releaseReservedStock(productId, quantity);
+        if (updated == 0) {
+            log.warn("Could not release reservedStock for product id={} (qty {}). Possible data inconsistency.",
+                    productId, quantity);
+        }
+
+        reservation.setStatus(ReservationStatus.EXPIRED);
+
+        Long orderId = reservation.getOrder().getId();
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
+        if (order.getStatus() == OrderStatus.INITIATED || order.getStatus() == OrderStatus.PENDING) {
             order.setStatus(OrderStatus.CANCELLED);
-            orderRepository.save(order);
-
-            log.info("Order {} cancelled. Inventory restored.", order.getId());
+            log.info("Order {} cancelled due to expired reservation {}.", orderId, reservationId);
         }
     }
 }

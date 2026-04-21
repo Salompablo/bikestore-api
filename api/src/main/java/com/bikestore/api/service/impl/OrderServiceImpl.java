@@ -7,14 +7,17 @@ import com.bikestore.api.dto.response.OrderResponse;
 import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.OrderItem;
 import com.bikestore.api.entity.Product;
+import com.bikestore.api.entity.StockReservation;
 import com.bikestore.api.entity.User;
 import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.entity.enums.OrderStatus;
+import com.bikestore.api.entity.enums.ReservationStatus;
 import com.bikestore.api.exception.ConflictException;
 import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.mapper.OrderMapper;
 import com.bikestore.api.repository.OrderRepository;
 import com.bikestore.api.repository.ProductRepository;
+import com.bikestore.api.repository.StockReservationRepository;
 import com.bikestore.api.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +27,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -37,6 +43,9 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderMapper orderMapper;
     private final ProductRepository productRepository;
+    private final StockReservationRepository stockReservationRepository;
+
+    private static final int RESERVATION_TTL_MINUTES = 15;
 
     @Override
     @Transactional(readOnly = true)
@@ -85,7 +94,7 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = new Order();
         order.setUser(authenticatedUser);
-        order.setStatus(OrderStatus.PENDING);
+        order.setStatus(OrderStatus.INITIATED);
         order.setDeliveryMethod(deliveryMethod);
 
         BigDecimal totalAmount = BigDecimal.ZERO;
@@ -96,6 +105,9 @@ public class OrderServiceImpl implements OrderService {
                         Collectors.summingInt(CartItemRequest::quantity)
                 ));
 
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(RESERVATION_TTL_MINUTES);
+        List<StockReservation> reservations = new ArrayList<>();
+
         for (Map.Entry<Long, Integer> entry : consolidatedCart.entrySet()) {
             Long productId = entry.getKey();
             Integer quantity = entry.getValue();
@@ -103,11 +115,18 @@ public class OrderServiceImpl implements OrderService {
             Product product = productRepository.findByIdWithLock(productId)
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
-            int updatedRows = productRepository.deductStock(productId, quantity);
+            int updatedRows = productRepository.reserveStock(productId, quantity);
 
             if (updatedRows == 0) {
                 throw new ConflictException("Not enough stock for: " + product.getName());
             }
+
+            reservations.add(StockReservation.builder()
+                    .product(product)
+                    .quantity(quantity)
+                    .status(ReservationStatus.ACTIVE)
+                    .expiresAt(expiresAt)
+                    .build());
 
             OrderItem orderItem = new OrderItem();
             orderItem.setProduct(product);
@@ -131,7 +150,16 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setTotalAmount(totalAmount);
-        return orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order);
+
+        for (StockReservation reservation : reservations) {
+            reservation.setOrder(savedOrder);
+            stockReservationRepository.save(reservation);
+        }
+
+        log.info("Order {} created in INITIATED state with {} reservation(s), expires at {}",
+                savedOrder.getId(), consolidatedCart.size(), expiresAt);
+        return savedOrder;
     }
 
     @Override
@@ -149,15 +177,32 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
 
-        if (order.getStatus() != OrderStatus.PENDING) {
+        if (order.getStatus() != OrderStatus.INITIATED && order.getStatus() != OrderStatus.PENDING) {
             log.warn("Order {} is already {}. Skipping webhook confirmation.", orderId, order.getStatus());
             return;
+        }
+
+        List<StockReservation> activeReservations =
+                stockReservationRepository.findByOrderIdAndStatus(orderId, ReservationStatus.ACTIVE);
+
+        for (StockReservation reservation : activeReservations) {
+            Long productId = reservation.getProduct().getId();
+            Integer quantity = reservation.getQuantity();
+
+            int updated = productRepository.deductAndReleaseStock(productId, quantity);
+            if (updated == 0) {
+                log.error("Failed to deduct stock for product {} (qty {}) on order {}. Possible data inconsistency.",
+                        productId, quantity, orderId);
+            }
+
+            reservation.setStatus(ReservationStatus.CONSUMED);
+            stockReservationRepository.save(reservation);
         }
 
         order.setStatus(OrderStatus.PAID);
         orderRepository.save(order);
 
-        log.info("Order {} confirmed as PAID.", orderId);
+        log.info("Order {} confirmed as PAID. {} reservation(s) consumed.", orderId, activeReservations.size());
     }
 
     private void validateStatusTransition(Order order, OrderStatus newStatus) {
