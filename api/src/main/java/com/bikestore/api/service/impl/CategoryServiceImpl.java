@@ -10,10 +10,10 @@ import com.bikestore.api.repository.CategoryRepository;
 import com.bikestore.api.repository.ProductRepository;
 import com.bikestore.api.service.CategoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -25,18 +25,14 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CategoryResponse> getAllCategories() {
-        return categoryRepository.findAll().stream()
-                .map(categoryMapper::toResponse)
-                .toList();
+    public Page<CategoryResponse> getAllCategories(Pageable pageable) {
+        return categoryRepository.findAll(pageable).map(categoryMapper::toResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<CategoryResponse> getActiveCategories() {
-        return categoryRepository.findByIsActiveTrue().stream()
-                .map(categoryMapper::toResponse)
-                .toList();
+    public Page<CategoryResponse> getActiveCategories(Pageable pageable) {
+        return categoryRepository.findByIsActiveTrue(pageable).map(categoryMapper::toResponse);
     }
 
     @Override

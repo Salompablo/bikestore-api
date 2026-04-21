@@ -6,6 +6,7 @@ import com.bikestore.api.dto.response.ErrorResponse;
 import com.bikestore.api.dto.response.PageResponse;
 import com.bikestore.api.dto.response.ProductResponse;
 import com.bikestore.api.service.ProductService;
+import com.bikestore.api.util.SortResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -17,19 +18,32 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
 @Tag(name = "Catalog", description = "Endpoints for managing products and searching the public catalog")
 public class ProductController {
+
+    static final Map<String, String> ALLOWED_SORT_FIELDS = Map.of(
+            "id", "id",
+            "name", "name",
+            "price", "price",
+            "stock", "stock",
+            "createdat", "createdAt",
+            "updatedat", "updatedAt",
+            "averagerating", "averageRating"
+    );
+    static final String DEFAULT_SORT_FIELD = "name";
+    static final Sort.Direction DEFAULT_SORT_DIRECTION = Sort.Direction.ASC;
 
     private final ProductService productService;
 
@@ -52,8 +66,20 @@ public class ProductController {
             @Parameter(description = "Optional filter for products in stock (stock > 0)", example = "true")
             @RequestParam(required = false) Boolean inStock,
 
-            @Parameter(hidden = true)
-            @PageableDefault(size = 12, sort = "name") Pageable pageable) {
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "Page size", example = "12")
+            @RequestParam(defaultValue = "12") int size,
+
+            @Parameter(description = "Sort field. Allowed values: id, name, price, stock, createdAt, updatedAt, averageRating. Defaults to 'name'.", example = "price")
+            @RequestParam(required = false) String sortField,
+
+            @Parameter(description = "Sort direction: asc or desc. Defaults to 'asc'.", example = "asc")
+            @RequestParam(required = false) String sortDirection) {
+
+        Pageable pageable = SortResolver.resolve(page, size, sortField, sortDirection,
+                ALLOWED_SORT_FIELDS, DEFAULT_SORT_FIELD, DEFAULT_SORT_DIRECTION);
 
         Page<ProductResponse> springPage = productService.getActiveProducts(categoryId, search, minPrice, maxPrice, inStock, pageable);
 
@@ -68,8 +94,20 @@ public class ProductController {
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/admin")
     public ResponseEntity<PageResponse<ProductResponse>> getAllProducts(
-            @Parameter(hidden = true)
-            @PageableDefault(size = 12, sort = "name") Pageable pageable) {
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "Page size", example = "12")
+            @RequestParam(defaultValue = "12") int size,
+
+            @Parameter(description = "Sort field. Allowed values: id, name, price, stock, createdAt, updatedAt, averageRating. Defaults to 'name'.", example = "name")
+            @RequestParam(required = false) String sortField,
+
+            @Parameter(description = "Sort direction: asc or desc. Defaults to 'asc'.", example = "asc")
+            @RequestParam(required = false) String sortDirection) {
+
+        Pageable pageable = SortResolver.resolve(page, size, sortField, sortDirection,
+                ALLOWED_SORT_FIELDS, DEFAULT_SORT_FIELD, DEFAULT_SORT_DIRECTION);
 
         Page<ProductResponse> springPage = productService.getAllProducts(pageable);
 

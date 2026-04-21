@@ -5,8 +5,11 @@ import com.bikestore.api.annotation.ApiNotFound;
 import com.bikestore.api.dto.request.CategoryRequest;
 import com.bikestore.api.dto.response.CategoryResponse;
 import com.bikestore.api.dto.response.ErrorResponse;
+import com.bikestore.api.dto.response.PageResponse;
 import com.bikestore.api.service.CategoryService;
+import com.bikestore.api.util.SortResolver;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -14,12 +17,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/categories")
@@ -27,22 +32,58 @@ import java.util.List;
 @Tag(name = "Categories", description = "Endpoints for managing product categories")
 public class CategoryController {
 
+    static final Map<String, String> ALLOWED_SORT_FIELDS = Map.of(
+            "id", "id",
+            "name", "name",
+            "isactive", "isActive"
+    );
+    static final String DEFAULT_SORT_FIELD = "name";
+    static final Sort.Direction DEFAULT_SORT_DIRECTION = Sort.Direction.ASC;
+
     private final CategoryService categoryService;
 
-    @Operation(summary = "Get all categories", description = "Retrieves a list of all product categories (including inactive). Requires ADMIN privileges.")
+    @Operation(summary = "Get all categories", description = "Retrieves a paginated list of all product categories (including inactive). Requires ADMIN privileges.")
     @ApiResponse(responseCode = "200", description = "Successfully retrieved categories")
     @ApiAdminErrors
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
-    public ResponseEntity<List<CategoryResponse>> getAllCategories() {
-        return ResponseEntity.ok(categoryService.getAllCategories());
+    public ResponseEntity<PageResponse<CategoryResponse>> getAllCategories(
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+
+            @Parameter(description = "Sort field. Allowed values: id, name, isActive. Defaults to 'name'.", example = "name")
+            @RequestParam(required = false) String sortField,
+
+            @Parameter(description = "Sort direction: asc or desc. Defaults to 'asc'.", example = "asc")
+            @RequestParam(required = false) String sortDirection) {
+
+        Pageable pageable = SortResolver.resolve(page, size, sortField, sortDirection,
+                ALLOWED_SORT_FIELDS, DEFAULT_SORT_FIELD, DEFAULT_SORT_DIRECTION);
+        return ResponseEntity.ok(PageResponse.of(categoryService.getAllCategories(pageable)));
     }
 
-    @Operation(summary = "Get active categories", description = "Retrieves a list of active product categories.")
+    @Operation(summary = "Get active categories", description = "Retrieves a paginated list of active product categories.")
     @ApiResponse(responseCode = "200", description = "Successfully retrieved active categories")
     @GetMapping("/active")
-    public ResponseEntity<List<CategoryResponse>> getActiveCategories() {
-        return ResponseEntity.ok(categoryService.getActiveCategories());
+    public ResponseEntity<PageResponse<CategoryResponse>> getActiveCategories(
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+
+            @Parameter(description = "Sort field. Allowed values: id, name, isActive. Defaults to 'name'.", example = "name")
+            @RequestParam(required = false) String sortField,
+
+            @Parameter(description = "Sort direction: asc or desc. Defaults to 'asc'.", example = "asc")
+            @RequestParam(required = false) String sortDirection) {
+
+        Pageable pageable = SortResolver.resolve(page, size, sortField, sortDirection,
+                ALLOWED_SORT_FIELDS, DEFAULT_SORT_FIELD, DEFAULT_SORT_DIRECTION);
+        return ResponseEntity.ok(PageResponse.of(categoryService.getActiveCategories(pageable)));
     }
 
     @Operation(summary = "Get category by ID", description = "Retrieves details of a specific category.")
