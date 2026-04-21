@@ -182,10 +182,27 @@ public class OrderServiceImpl implements OrderService {
             return;
         }
 
+        List<StockReservation> activeReservations =
+                stockReservationRepository.findByOrderIdAndStatus(orderId, ReservationStatus.ACTIVE);
+
+        for (StockReservation reservation : activeReservations) {
+            Long productId = reservation.getProduct().getId();
+            Integer quantity = reservation.getQuantity();
+
+            int updated = productRepository.deductAndReleaseStock(productId, quantity);
+            if (updated == 0) {
+                log.error("Failed to deduct stock for product {} (qty {}) on order {}. Possible data inconsistency.",
+                        productId, quantity, orderId);
+            }
+
+            reservation.setStatus(ReservationStatus.CONSUMED);
+            stockReservationRepository.save(reservation);
+        }
+
         order.setStatus(OrderStatus.PAID);
         orderRepository.save(order);
 
-        log.info("Order {} confirmed as PAID.", orderId);
+        log.info("Order {} confirmed as PAID. {} reservation(s) consumed.", orderId, activeReservations.size());
     }
 
     private void validateStatusTransition(Order order, OrderStatus newStatus) {
