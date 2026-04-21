@@ -74,6 +74,10 @@ public class Product {
     @Builder.Default
     private Integer reviewCount = 0;
 
+    @Column(name = "reserved_stock", nullable = false)
+    @Builder.Default
+    private Integer reservedStock = 0;
+
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
