@@ -31,6 +31,11 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     Optional<Product> findByIdWithLock(@Param("id") Long id);
 
     @Modifying
+    @Query("UPDATE Product p SET p.reservedStock = p.reservedStock + :quantity " +
+           "WHERE p.id = :productId AND (p.stock - p.reservedStock) >= :quantity")
+    int reserveStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
+
+    @Modifying
     @Query("UPDATE Product p SET p.stock = p.stock - :quantity WHERE p.id = :productId AND p.stock >= :quantity")
     int deductStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 
