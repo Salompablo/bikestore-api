@@ -14,6 +14,7 @@ import com.bikestore.api.mapper.ShippingZoneMapper;
 import com.bikestore.api.repository.ShippingZoneRepository;
 import com.bikestore.api.service.OrderService;
 import com.bikestore.api.service.UserService;
+import com.bikestore.api.util.SortResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -23,13 +24,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -37,6 +38,25 @@ import java.util.List;
 @PreAuthorize("hasRole('ADMIN')")
 @Tag(name = "Admin", description = "Endpoints for platform administration (Users, Orders, and Shipping Zones)")
 public class AdminController {
+
+    static final Map<String, String> ALLOWED_ORDER_SORT_FIELDS = Map.of(
+            "id", "id",
+            "createdat", "createdAt",
+            "updatedat", "updatedAt",
+            "status", "status",
+            "totalamount", "totalAmount"
+    );
+    static final String DEFAULT_ORDER_SORT_FIELD = "createdAt";
+    static final Sort.Direction DEFAULT_ORDER_SORT_DIRECTION = Sort.Direction.DESC;
+
+    static final Map<String, String> ALLOWED_USER_SORT_FIELDS = Map.of(
+            "id", "id",
+            "email", "email",
+            "firstname", "firstName",
+            "lastname", "lastName"
+    );
+    static final String DEFAULT_USER_SORT_FIELD = "email";
+    static final Sort.Direction DEFAULT_USER_SORT_DIRECTION = Sort.Direction.ASC;
 
     private final OrderService orderService;
     private final UserService userService;
@@ -48,7 +68,20 @@ public class AdminController {
     @ApiAdminErrors
     @GetMapping("/orders")
     public ResponseEntity<PageResponse<OrderResponse>> getAllOrders(
-            @Parameter(hidden = true) @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "Page size", example = "10")
+            @RequestParam(defaultValue = "10") int size,
+
+            @Parameter(description = "Sort field. Allowed values: id, createdAt, updatedAt, status, totalAmount. Defaults to 'createdAt'.", example = "createdAt")
+            @RequestParam(required = false) String sortField,
+
+            @Parameter(description = "Sort direction: asc or desc. Defaults to 'desc'.", example = "desc")
+            @RequestParam(required = false) String sortDirection) {
+
+        Pageable pageable = SortResolver.resolve(page, size, sortField, sortDirection,
+                ALLOWED_ORDER_SORT_FIELDS, DEFAULT_ORDER_SORT_FIELD, DEFAULT_ORDER_SORT_DIRECTION);
 
         Page<OrderResponse> springPage = orderService.getAllOrders(pageable);
         return ResponseEntity.ok(PageResponse.of(springPage));
@@ -70,7 +103,20 @@ public class AdminController {
     @ApiAdminErrors
     @GetMapping("/users")
     public ResponseEntity<PageResponse<UserResponse>> getAllUsers(
-            @Parameter(hidden = true) @PageableDefault(size = 20, sort = "email", direction = Sort.Direction.ASC) Pageable pageable) {
+            @Parameter(description = "Page number (0-indexed)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "Page size", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+
+            @Parameter(description = "Sort field. Allowed values: id, email, firstName, lastName. Defaults to 'email'.", example = "email")
+            @RequestParam(required = false) String sortField,
+
+            @Parameter(description = "Sort direction: asc or desc. Defaults to 'asc'.", example = "asc")
+            @RequestParam(required = false) String sortDirection) {
+
+        Pageable pageable = SortResolver.resolve(page, size, sortField, sortDirection,
+                ALLOWED_USER_SORT_FIELDS, DEFAULT_USER_SORT_FIELD, DEFAULT_USER_SORT_DIRECTION);
 
         Page<UserResponse> springPage = userService.getAllUsers(pageable);
         return ResponseEntity.ok(PageResponse.of(springPage));
