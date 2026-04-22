@@ -65,6 +65,12 @@ public class OrderCleanupService {
         StockReservation reservation = stockReservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation not found: " + reservationId));
 
+        // Guard: another thread (confirmOrder/cancelOrder) may have already consumed or expired this reservation
+        if (reservation.getStatus() != ReservationStatus.ACTIVE) {
+            log.info("Reservation {} is already {} — skipping expiration.", reservationId, reservation.getStatus());
+            return;
+        }
+
         Long productId = reservation.getProduct().getId();
         Integer quantity = reservation.getQuantity();
 
@@ -75,12 +81,14 @@ public class OrderCleanupService {
         }
 
         reservation.setStatus(ReservationStatus.EXPIRED);
+        stockReservationRepository.save(reservation);
 
         Long orderId = reservation.getOrder().getId();
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
         if (order.getStatus() == OrderStatus.INITIATED || order.getStatus() == OrderStatus.PENDING) {
             order.setStatus(OrderStatus.CANCELLED);
+            orderRepository.save(order);
             log.info("Order {} cancelled due to expired reservation {}.", orderId, reservationId);
         }
     }
