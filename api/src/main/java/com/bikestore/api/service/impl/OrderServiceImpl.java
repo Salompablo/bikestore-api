@@ -186,11 +186,6 @@ public class OrderServiceImpl implements OrderService {
                 stockReservationRepository.findByOrderIdAndStatus(orderId, ReservationStatus.ACTIVE);
 
         for (StockReservation reservation : activeReservations) {
-            if (reservation.getStatus() != ReservationStatus.ACTIVE) {
-                log.warn("Reservation {} is already {} at confirm time, skipping.",
-                        reservation.getId(), reservation.getStatus());
-                continue;
-            }
             Long productId = reservation.getProduct().getId();
             Integer quantity = reservation.getQuantity();
 
@@ -235,11 +230,6 @@ public class OrderServiceImpl implements OrderService {
                 stockReservationRepository.findByOrderIdAndStatus(orderId, ReservationStatus.ACTIVE);
 
         for (StockReservation reservation : activeReservations) {
-            if (reservation.getStatus() != ReservationStatus.ACTIVE) {
-                log.warn("Reservation {} is already {} at cancel time, skipping.",
-                        reservation.getId(), reservation.getStatus());
-                continue;
-            }
             int updated = productRepository.releaseReservedStock(
                     reservation.getProduct().getId(), reservation.getQuantity());
             if (updated == 0) {
