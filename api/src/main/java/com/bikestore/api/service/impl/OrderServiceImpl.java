@@ -174,7 +174,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public void confirmOrder(Long orderId) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
 
         if (order.getStatus() != OrderStatus.INITIATED && order.getStatus() != OrderStatus.PENDING) {
@@ -186,6 +186,11 @@ public class OrderServiceImpl implements OrderService {
                 stockReservationRepository.findByOrderIdAndStatus(orderId, ReservationStatus.ACTIVE);
 
         for (StockReservation reservation : activeReservations) {
+            if (reservation.getStatus() != ReservationStatus.ACTIVE) {
+                log.warn("Reservation {} is already {} at confirm time, skipping.",
+                        reservation.getId(), reservation.getStatus());
+                continue;
+            }
             Long productId = reservation.getProduct().getId();
             Integer quantity = reservation.getQuantity();
 
@@ -208,11 +213,17 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public void cancelOrder(Long orderId, User authenticatedUser) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
 
         if (!order.getUser().getId().equals(authenticatedUser.getId())) {
             throw new ConflictException("Order does not belong to the authenticated user");
+        }
+
+        // Idempotency: already cancelled → no-op (supports double-DELETE safely)
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            log.info("Order {} already cancelled, no-op.", orderId);
+            return;
         }
 
         if (order.getStatus() != OrderStatus.INITIATED && order.getStatus() != OrderStatus.PENDING) {
@@ -224,6 +235,11 @@ public class OrderServiceImpl implements OrderService {
                 stockReservationRepository.findByOrderIdAndStatus(orderId, ReservationStatus.ACTIVE);
 
         for (StockReservation reservation : activeReservations) {
+            if (reservation.getStatus() != ReservationStatus.ACTIVE) {
+                log.warn("Reservation {} is already {} at cancel time, skipping.",
+                        reservation.getId(), reservation.getStatus());
+                continue;
+            }
             int updated = productRepository.releaseReservedStock(
                     reservation.getProduct().getId(), reservation.getQuantity());
             if (updated == 0) {

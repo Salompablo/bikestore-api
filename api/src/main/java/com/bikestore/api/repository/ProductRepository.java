@@ -42,7 +42,7 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     @Modifying
     @Query("UPDATE Product p SET p.stock = p.stock - :quantity, p.reservedStock = p.reservedStock - :quantity " +
-           "WHERE p.id = :productId AND p.stock >= :quantity")
+           "WHERE p.id = :productId AND p.stock >= :quantity AND p.reservedStock >= :quantity")
     int deductAndReleaseStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
 
     @Modifying

@@ -25,11 +25,21 @@ public class CheckoutFacade {
 
     public CheckoutResponse initializeCheckout(CheckoutRequest request, User authenticatedUser) {
         Order order = orderService.createPendingOrder(request, authenticatedUser);
-        CheckoutInfo checkoutInfo = paymentGatewayService.createPreference(order);
-        orderService.updateOrderPreference(order.getId(), checkoutInfo.preferenceId());
-
-        log.info("Checkout initialized for Order {}. MP Preference: {}", order.getId(), checkoutInfo.preferenceId());
-        return new CheckoutResponse(order.getId(), checkoutInfo.preferenceId(), checkoutInfo.initPoint());
+        try {
+            CheckoutInfo checkoutInfo = paymentGatewayService.createPreference(order);
+            orderService.updateOrderPreference(order.getId(), checkoutInfo.preferenceId());
+            log.info("Checkout initialized for Order {}. MP Preference: {}", order.getId(), checkoutInfo.preferenceId());
+            return new CheckoutResponse(order.getId(), checkoutInfo.preferenceId(), checkoutInfo.initPoint());
+        } catch (Exception e) {
+            log.error("Failed to create MP preference for Order {}. Releasing reservation.", order.getId(), e);
+            try {
+                orderService.cancelOrder(order.getId(), authenticatedUser);
+            } catch (Exception compensationError) {
+                log.error("Compensation cancelOrder also failed for Order {}. Manual intervention needed.",
+                        order.getId(), compensationError);
+            }
+            throw new RuntimeException("Payment initialization failed. Please retry.", e);
+        }
     }
 
     public void processWebHook(Long paymentId, String eventId) {

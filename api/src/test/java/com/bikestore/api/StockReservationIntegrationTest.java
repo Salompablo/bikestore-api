@@ -46,7 +46,10 @@ import java.util.concurrent.Future;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest
@@ -202,6 +205,186 @@ class StockReservationIntegrationTest {
         Order updatedOrder = orderRepository.findById(order.getId()).orElseThrow();
         assertEquals(OrderStatus.CANCELLED, updatedOrder.getStatus(),
                 "order must be CANCELLED");
+    }
+
+    // ── Test 4: confirmOrder vs cancelOrder race ──────────────────────────────
+
+    @Test
+    @DisplayName("Race: confirmOrder and cancelOrder on the same order are mutually exclusive")
+    void testConfirmCancelRace() throws Exception {
+        Product product = createProduct(5);
+        Order order = orderService.createPendingOrder(checkoutFor(product.getId(), 1), testUser);
+        Long orderId = order.getId();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch go = new CountDownLatch(1);
+
+        Future<?> confirmFuture = executor.submit(() -> {
+            ready.countDown();
+            try { go.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            orderService.confirmOrder(orderId);
+        });
+
+        Future<?> cancelFuture = executor.submit(() -> {
+            ready.countDown();
+            try { go.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            orderService.cancelOrder(orderId, testUser);
+        });
+
+        ready.await();
+        go.countDown();
+        executor.shutdown();
+        executor.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS);
+
+        // Absorb ConflictException: one operation wins; the other may throw
+        try { confirmFuture.get(); } catch (ExecutionException e) { /* acceptable */ }
+        try { cancelFuture.get(); } catch (ExecutionException e) { /* acceptable */ }
+
+        Product refreshed = productRepository.findById(product.getId()).orElseThrow();
+        assertTrue(refreshed.getReservedStock() >= 0,
+                "reservedStock must never be negative");
+        assertTrue(refreshed.getReservedStock() <= refreshed.getStock(),
+                "reservedStock must not exceed total stock");
+
+        Order finalOrder = orderRepository.findById(orderId).orElseThrow();
+        assertTrue(finalOrder.getStatus() == OrderStatus.PAID
+                        || finalOrder.getStatus() == OrderStatus.CANCELLED,
+                "Order must be in exactly one terminal state (PAID or CANCELLED)");
+    }
+
+    // ── Test 5: confirmOrder vs expireReservation race ────────────────────────
+
+    @Test
+    @DisplayName("Race: confirmOrder and expireReservation on the same reservation are mutually exclusive")
+    void testConfirmExpireRace() throws Exception {
+        Product product = createProduct(5);
+        Order order = orderService.createPendingOrder(checkoutFor(product.getId(), 1), testUser);
+        Long orderId = order.getId();
+
+        StockReservation reservation = stockReservationRepository.findByOrderId(orderId).get(0);
+        reservation.setExpiresAt(LocalDateTime.now().minusMinutes(20));
+        stockReservationRepository.save(reservation);
+        Long reservationId = reservation.getId();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch go = new CountDownLatch(1);
+
+        Future<?> confirmFuture = executor.submit(() -> {
+            ready.countDown();
+            try { go.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            orderService.confirmOrder(orderId);
+        });
+
+        Future<?> expireFuture = executor.submit(() -> {
+            ready.countDown();
+            try { go.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            orderCleanupService.expireReservation(reservationId);
+        });
+
+        ready.await();
+        go.countDown();
+        executor.shutdown();
+        executor.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS);
+
+        // Both operations are safe-to-no-op when they lose the race
+        try { confirmFuture.get(); } catch (ExecutionException e) { /* acceptable */ }
+        try { expireFuture.get(); } catch (ExecutionException e) { /* acceptable */ }
+
+        Product refreshed = productRepository.findById(product.getId()).orElseThrow();
+        assertTrue(refreshed.getReservedStock() >= 0,
+                "reservedStock must never be negative");
+        assertTrue(refreshed.getReservedStock() <= refreshed.getStock(),
+                "reservedStock must not exceed total stock");
+    }
+
+    // ── Test 6: createPreference failure releases stock immediately ───────────
+
+    @Test
+    @DisplayName("Compensation: createPreference failure triggers immediate stock release")
+    void testCreatePreferenceFailureReleasesStock() {
+        Product product = createProduct(5);
+
+        doThrow(new RuntimeException("Simulated MP failure"))
+                .when(paymentGatewayService).createPreference(any());
+
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                () -> checkoutFacade.initializeCheckout(checkoutFor(product.getId(), 1), testUser));
+
+        Product refreshed = productRepository.findById(product.getId()).orElseThrow();
+        assertEquals(0, refreshed.getReservedStock(),
+                "reservedStock must be 0 after MP failure compensation");
+
+        List<Order> orders = orderRepository.findAll();
+        assertFalse(orders.isEmpty(), "An order must have been created");
+        Order createdOrder = orders.get(0);
+        assertEquals(OrderStatus.CANCELLED, createdOrder.getStatus(),
+                "Order must be CANCELLED after failed checkout");
+
+        List<StockReservation> reservations = stockReservationRepository.findByOrderId(createdOrder.getId());
+        assertFalse(reservations.isEmpty(), "Reservation must exist");
+        assertEquals(ReservationStatus.EXPIRED, reservations.get(0).getStatus(),
+                "Reservation must be EXPIRED after compensation");
+    }
+
+    // ── Test 7: cancelOrder idempotent ────────────────────────────────────────
+
+    @Test
+    @DisplayName("Idempotency: double cancelOrder returns without exception and does not double-release stock")
+    void testCancelOrderIdempotent() {
+        Product product = createProduct(5);
+        Order order = orderService.createPendingOrder(checkoutFor(product.getId(), 1), testUser);
+        Long orderId = order.getId();
+
+        // First cancel — performs the release
+        orderService.cancelOrder(orderId, testUser);
+
+        Product afterFirstCancel = productRepository.findById(product.getId()).orElseThrow();
+        assertEquals(0, afterFirstCancel.getReservedStock(),
+                "reservedStock must be 0 after first cancel");
+
+        // Second cancel — must be a no-op, no exception, no negative stock
+        assertDoesNotThrow(() -> orderService.cancelOrder(orderId, testUser),
+                "Second cancelOrder must not throw");
+
+        Product afterSecondCancel = productRepository.findById(product.getId()).orElseThrow();
+        assertEquals(0, afterSecondCancel.getReservedStock(),
+                "reservedStock must still be 0 after second cancel — no double-release");
+        assertEquals(5, afterSecondCancel.getStock(),
+                "Physical stock must not change on cancel");
+    }
+
+    // ── Test 8: reserved_stock invariant ─────────────────────────────────────
+
+    @Test
+    @DisplayName("Invariant: 0 <= reservedStock <= stock after mixed reserve/release/confirm operations")
+    void testReservedStockInvariant() {
+        Product productA = createProduct(10);
+        Product productB = createProduct(3);
+
+        // Reserve product A (qty 3) and confirm the order
+        Order orderA = orderService.createPendingOrder(checkoutFor(productA.getId(), 3), testUser);
+        orderService.confirmOrder(orderA.getId());
+
+        // Reserve product B (qty 3, full stock) and cancel the order
+        Order orderB = orderService.createPendingOrder(checkoutFor(productB.getId(), 3), testUser);
+        orderService.cancelOrder(orderB.getId(), testUser);
+
+        // Reserve product A again (qty 2) and let it expire
+        Order orderC = orderService.createPendingOrder(checkoutFor(productA.getId(), 2), testUser);
+        StockReservation res = stockReservationRepository.findByOrderId(orderC.getId()).get(0);
+        res.setExpiresAt(LocalDateTime.now().minusMinutes(5));
+        stockReservationRepository.save(res);
+        orderCleanupService.releaseExpiredReservations();
+
+        // Assert invariant on all products
+        productRepository.findAll().forEach(p -> {
+            assertTrue(p.getReservedStock() >= 0,
+                    "reservedStock must be >= 0 for product " + p.getId());
+            assertTrue(p.getReservedStock() <= p.getStock(),
+                    "reservedStock must be <= stock for product " + p.getId());
+        });
     }
 
     // ── Test 3: Webhook Idempotency ───────────────────────────────────────────
