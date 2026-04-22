@@ -205,6 +205,42 @@ public class OrderServiceImpl implements OrderService {
         log.info("Order {} confirmed as PAID. {} reservation(s) consumed.", orderId, activeReservations.size());
     }
 
+    @Override
+    @Transactional
+    public void cancelOrder(Long orderId, User authenticatedUser) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+
+        if (!order.getUser().getId().equals(authenticatedUser.getId())) {
+            throw new ConflictException("Order does not belong to the authenticated user");
+        }
+
+        if (order.getStatus() != OrderStatus.INITIATED && order.getStatus() != OrderStatus.PENDING) {
+            throw new ConflictException(
+                    "Cannot cancel order in status: " + order.getStatus());
+        }
+
+        List<StockReservation> activeReservations =
+                stockReservationRepository.findByOrderIdAndStatus(orderId, ReservationStatus.ACTIVE);
+
+        for (StockReservation reservation : activeReservations) {
+            int updated = productRepository.releaseReservedStock(
+                    reservation.getProduct().getId(), reservation.getQuantity());
+            if (updated == 0) {
+                log.warn("Could not release reservedStock for product id={} (qty {}). Possible data inconsistency.",
+                        reservation.getProduct().getId(), reservation.getQuantity());
+            }
+            reservation.setStatus(ReservationStatus.EXPIRED);
+            stockReservationRepository.save(reservation);
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
+
+        log.info("Order {} cancelled by user {}. {} reservation(s) released.",
+                orderId, authenticatedUser.getId(), activeReservations.size());
+    }
+
     private void validateStatusTransition(Order order, OrderStatus newStatus) {
         OrderStatus current = order.getStatus();
         DeliveryMethod method = order.getDeliveryMethod();

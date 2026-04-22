@@ -17,7 +17,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -67,5 +69,19 @@ public class OrderController {
 
         Page<OrderResponse> springPage = orderService.getMyOrders(authenticatedUser, pageable);
         return ResponseEntity.ok(PageResponse.of(springPage));
+    }
+
+    @Operation(summary = "Cancel an order", description = "Cancels an order that is still in INITIATED or PENDING status, releasing the stock reservations. Requires CUSTOMER privileges.")
+    @ApiResponse(responseCode = "204", description = "Order successfully cancelled")
+    @ApiCustomerErrors
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> cancelOrder(
+            @Parameter(description = "Order ID to cancel", example = "1")
+            @PathVariable Long id,
+            @Parameter(hidden = true) @AuthenticationPrincipal User authenticatedUser) {
+
+        orderService.cancelOrder(id, authenticatedUser);
+        return ResponseEntity.noContent().build();
     }
 }
