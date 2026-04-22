@@ -45,7 +45,7 @@ public class OrderServiceImpl implements OrderService {
     private final ProductRepository productRepository;
     private final StockReservationRepository stockReservationRepository;
 
-    private static final int RESERVATION_TTL_MINUTES = 15;
+    private static final int RESERVATION_TTL_MINUTES = 10;
 
     @Override
     @Transactional(readOnly = true)
