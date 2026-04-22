@@ -15,4 +15,5 @@ public interface OrderService {
     Order createPendingOrder(CheckoutRequest checkoutRequest, User authenticatedUser);
     void updateOrderPreference(Long orderId, String preferenceId);
     void confirmOrder(Long orderId);
+    void cancelOrder(Long orderId, User authenticatedUser);
 }
