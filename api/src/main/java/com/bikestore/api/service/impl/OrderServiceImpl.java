@@ -46,6 +46,7 @@ public class OrderServiceImpl implements OrderService {
     private final StockReservationRepository stockReservationRepository;
 
     private static final int RESERVATION_TTL_MINUTES = 10;
+    private static final Set<OrderStatus> CANCELLABLE_STATUSES = EnumSet.of(OrderStatus.INITIATED, OrderStatus.PENDING);
 
     @Override
     @Transactional(readOnly = true)
@@ -92,6 +93,15 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        // Cancel any pre-existing active order for this user before creating a new one
+        List<Order> activeOrders = orderRepository.findByUserIdAndStatusIn(
+                authenticatedUser.getId(), CANCELLABLE_STATUSES);
+        for (Order activeOrder : activeOrders) {
+            log.info("Auto-cancelling existing active order {} for user {} before creating a new one.",
+                    activeOrder.getId(), authenticatedUser.getId());
+            internalCancelOrder(activeOrder);
+        }
+
         Order order = new Order();
         order.setUser(authenticatedUser);
         order.setStatus(OrderStatus.INITIATED);
@@ -118,7 +128,11 @@ public class OrderServiceImpl implements OrderService {
             int updatedRows = productRepository.reserveStock(productId, quantity);
 
             if (updatedRows == 0) {
-                throw new ConflictException("Not enough stock for: " + product.getName());
+                throw new ConflictException(
+                        "Not enough stock for: " + product.getName(),
+                        "RESERVED_TEMPORARILY",
+                        RESERVATION_TTL_MINUTES * 60
+                );
             }
 
             reservations.add(StockReservation.builder()
@@ -226,8 +240,19 @@ public class OrderServiceImpl implements OrderService {
                     "Cannot cancel order in status: " + order.getStatus());
         }
 
+        internalCancelOrder(order);
+        log.info("Order {} cancelled by user {}.", orderId, authenticatedUser.getId());
+    }
+
+    /**
+     * Releases all ACTIVE stock reservations for the given order and marks the order as CANCELLED.
+     * If releasing reserved stock for a reservation fails (concurrent update), a warning is logged
+     * and processing continues with the remaining reservations.
+     * Must be called within an active transaction.
+     */
+    private void internalCancelOrder(Order order) {
         List<StockReservation> activeReservations =
-                stockReservationRepository.findByOrderIdAndStatus(orderId, ReservationStatus.ACTIVE);
+                stockReservationRepository.findByOrderIdAndStatus(order.getId(), ReservationStatus.ACTIVE);
 
         for (StockReservation reservation : activeReservations) {
             int updated = productRepository.releaseReservedStock(
@@ -243,8 +268,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
 
-        log.info("Order {} cancelled by user {}. {} reservation(s) released.",
-                orderId, authenticatedUser.getId(), activeReservations.size());
+        log.info("Order {} cancelled. {} reservation(s) released.", order.getId(), activeReservations.size());
     }
 
     private void validateStatusTransition(Order order, OrderStatus newStatus) {

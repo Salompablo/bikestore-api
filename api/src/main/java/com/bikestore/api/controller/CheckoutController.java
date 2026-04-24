@@ -47,7 +47,11 @@ public class CheckoutController {
                             """))),
             @ApiResponse(responseCode = "404", description = "Not Found - User or Product does not exist",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "Conflict - Not enough stock remaining to fulfill the order",
+            @ApiResponse(responseCode = "409", description = """
+                    Conflict – Not enough available stock to fulfill the order.
+                    The response body includes:
+                    - errorCode: "RESERVED_TEMPORARILY" — some units are held by other active orders and will be released within retryAfterSeconds.
+                    - retryAfterSeconds: suggested wait time in seconds before retrying.""",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     })
     @ApiCustomerErrors

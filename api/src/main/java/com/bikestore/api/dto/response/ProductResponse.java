@@ -50,6 +50,11 @@ public record ProductResponse(
         Double width,
 
         @Schema(description = "Height in centimeters", example = "105.0")
-        Double height
+        Double height,
+
+        @Schema(description = "Units currently available to reserve (stock minus active reservations). " +
+                "Use this value instead of 'stock' to avoid showing misleading availability to the customer.",
+                example = "7")
+        Integer availableToReserveNow
 ) {
 }

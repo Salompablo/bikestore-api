@@ -17,6 +17,19 @@ public record ErrorResponse(
         String message,
 
         @Schema(description = "Timestamp when the error occurred", example = "2026-03-10T15:30:00.000Z")
-        LocalDateTime timestamp
+        LocalDateTime timestamp,
+
+        @Schema(description = """
+                Machine-readable error code for client-side message mapping. Possible values:
+                - RESERVED_TEMPORARILY: one or more products lack available stock because units are \
+                temporarily reserved by other active orders. Retry after retryAfterSeconds.""",
+                example = "RESERVED_TEMPORARILY",
+                nullable = true)
+        String errorCode,
+
+        @Schema(description = "Suggested seconds to wait before retrying. Present when errorCode is RESERVED_TEMPORARILY.",
+                example = "600",
+                nullable = true)
+        Integer retryAfterSeconds
 ) {
 }
