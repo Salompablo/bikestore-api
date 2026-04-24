@@ -46,7 +46,7 @@ public class OrderServiceImpl implements OrderService {
     private final StockReservationRepository stockReservationRepository;
 
     private static final int RESERVATION_TTL_MINUTES = 10;
-    private static final Set<OrderStatus> ACTIVE_STATUSES = EnumSet.of(OrderStatus.INITIATED, OrderStatus.PENDING);
+    private static final Set<OrderStatus> CANCELLABLE_STATUSES = EnumSet.of(OrderStatus.INITIATED, OrderStatus.PENDING);
 
     @Override
     @Transactional(readOnly = true)
@@ -95,7 +95,7 @@ public class OrderServiceImpl implements OrderService {
 
         // Cancel any pre-existing active order for this user before creating a new one
         List<Order> activeOrders = orderRepository.findByUserIdAndStatusIn(
-                authenticatedUser.getId(), ACTIVE_STATUSES);
+                authenticatedUser.getId(), CANCELLABLE_STATUSES);
         for (Order activeOrder : activeOrders) {
             log.info("Auto-cancelling existing active order {} for user {} before creating a new one.",
                     activeOrder.getId(), authenticatedUser.getId());
@@ -246,6 +246,8 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * Releases all ACTIVE stock reservations for the given order and marks the order as CANCELLED.
+     * If releasing reserved stock for a reservation fails (concurrent update), a warning is logged
+     * and processing continues with the remaining reservations.
      * Must be called within an active transaction.
      */
     private void internalCancelOrder(Order order) {
