@@ -23,7 +23,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex) {
-        return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), ex.getErrorCode(), ex.getRetryAfterSeconds());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -64,11 +64,18 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ErrorResponse> buildErrorResponse(HttpStatus status, String message) {
+        return buildErrorResponse(status, message, null, null);
+    }
+
+    private ResponseEntity<ErrorResponse> buildErrorResponse(HttpStatus status, String message,
+                                                              String errorCode, Integer retryAfterSeconds) {
         ErrorResponse errorResponse = new ErrorResponse(
                 status.value(),
                 status.getReasonPhrase(),
                 message,
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                errorCode,
+                retryAfterSeconds
         );
         return new ResponseEntity<>(errorResponse, status);
     }

@@ -30,6 +30,7 @@ public class ProductMapper {
     }
 
     public ProductResponse toResponse(Product product) {
+        int availableToReserveNow = Math.max(0, product.getStock() - product.getReservedStock());
         return new ProductResponse(
                 product.getId(),
                 product.getSku(),
@@ -51,7 +52,8 @@ public class ProductMapper {
                 product.getWeight(),
                 product.getLength(),
                 product.getWidth(),
-                product.getHeight()
+                product.getHeight(),
+                availableToReserveNow
         );
     }
 
