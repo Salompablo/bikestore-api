@@ -28,6 +28,9 @@ public class WebhookController {
     private final MercadoPagoIpValidator ipValidator;
     private final WebhookRateLimiter rateLimiter;
 
+    /** Prefix used to namespace IPN-based deduplication event IDs stored in {@link com.bikestore.api.entity.WebhookEvent}. */
+    private static final String IPN_EVENT_ID_PREFIX = "ipn-";
+
     @Operation(
             summary = "Mercado Pago Webhook & IPN Receiver",
             description = """
@@ -100,7 +103,7 @@ public class WebhookController {
                 log.info("Processing IPN. Payment ID: {}, origin IP: {}", actualId, clientIp);
                 if ("payment".equals(topic)) {
                     // Use a stable synthetic event ID so duplicate IPN retries from MP are deduplicated
-                    checkoutFacade.processWebHook(Long.valueOf(actualId), "ipn-" + actualId);
+                    checkoutFacade.processWebHook(Long.valueOf(actualId), IPN_EVENT_ID_PREFIX + actualId);
                 }
             }
 

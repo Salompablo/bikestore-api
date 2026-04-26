@@ -14,6 +14,10 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  * <p>Allows up to {@code webhook.ipn.rate-limit.max-requests} requests per IP within a rolling
  * {@code webhook.ipn.rate-limit.window-seconds} window. A background task runs every 5 minutes to
  * evict entries for IPs that have no recent activity, preventing unbounded memory growth.
+ *
+ * <p><strong>Scheduling requirement:</strong> The eviction task relies on {@link org.springframework.scheduling.annotation.Scheduled}.
+ * {@code @EnableScheduling} must be present on a configuration class (already declared on
+ * {@link com.bikestore.api.BikeStoreApplication}).
  */
 @Component
 @Slf4j
