@@ -23,13 +23,22 @@ import java.util.List;
 public class MercadoPagoIpValidator {
 
     private final List<String> allowedCidrs;
+    private final boolean validationEnabled;
 
     public MercadoPagoIpValidator(
-            @Value("#{'${mercadopago.allowed-ips}'.split(',')}") List<String> allowedCidrs) {
+            @Value("#{'${mercadopago.allowed-ips}'.split(',')}") List<String> allowedCidrs,
+            @Value("${mercadopago.ip-validation.enabled:true}") boolean validationEnabled) {
         this.allowedCidrs = allowedCidrs;
+        this.validationEnabled = validationEnabled;
     }
 
     public boolean isAllowed(String clientIp) {
+
+        if (!validationEnabled) {
+            log.info("⚠️ Mercado Pago IP validation is DISABLED. Permitting request from IP: {}", clientIp);
+            return true;
+        }
+
         if (clientIp == null || clientIp.isBlank()) {
             return false;
         }
