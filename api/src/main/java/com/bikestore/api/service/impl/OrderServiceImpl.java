@@ -47,11 +47,12 @@ public class OrderServiceImpl implements OrderService {
 
     private static final int RESERVATION_TTL_MINUTES = 10;
     private static final Set<OrderStatus> CANCELLABLE_STATUSES = EnumSet.of(OrderStatus.INITIATED, OrderStatus.PENDING);
+    private static final Set<OrderStatus> HIDDEN_FROM_USER = EnumSet.of(OrderStatus.INITIATED);
 
     @Override
     @Transactional(readOnly = true)
     public Page<OrderResponse> getMyOrders(User authenticatedUser, Pageable pageable) {
-        return orderRepository.findByUserId(authenticatedUser.getId(), pageable)
+        return orderRepository.findByUserIdAndStatusNotIn(authenticatedUser.getId(), HIDDEN_FROM_USER, pageable)
                 .map(orderMapper::toOrderResponse);
     }
 
@@ -217,6 +218,28 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
 
         log.info("Order {} confirmed as PAID. {} reservation(s) consumed.", orderId, activeReservations.size());
+    }
+
+    @Override
+    @Transactional
+    public void markOrderAsPending(Long orderId) {
+        Order order = orderRepository.findByIdWithLock(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
+
+        if (order.getStatus() == OrderStatus.PENDING) {
+            log.info("Order {} is already PENDING. Skipping.", orderId);
+            return;
+        }
+
+        if (order.getStatus() != OrderStatus.INITIATED) {
+            log.warn("Order {} is in status {}. Cannot transition to PENDING.", orderId, order.getStatus());
+            return;
+        }
+
+        order.setStatus(OrderStatus.PENDING);
+        orderRepository.save(order);
+
+        log.info("Order {} transitioned from INITIATED to PENDING.", orderId);
     }
 
     @Override
