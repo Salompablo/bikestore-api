@@ -19,6 +19,7 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findByUserId(Long userId, Pageable pageable);
+    Page<Order> findByUserIdAndStatusNotIn(Long userId, Collection<OrderStatus> statuses, Pageable pageable);
     List<Order> findByStatusAndCreatedAtBefore(OrderStatus status, LocalDateTime time);
     List<Order> findByUserIdAndStatusIn(Long userId, Collection<OrderStatus> statuses);
 

@@ -70,6 +70,19 @@ public class CheckoutFacade {
 
                 Long orderId = Long.parseLong(orderIdStr);
                 orderService.confirmOrder(orderId);
+
+            } else if ("pending".equals(paymentInfo.status())) {
+                String orderIdStr = paymentInfo.externalReference();
+
+                if (orderIdStr == null || orderIdStr.isEmpty()) {
+                    log.warn("Payment {} pending but has no external reference (Order ID). Skipping.", paymentId);
+                    event.setStatus(WebhookEventStatus.FAILED);
+                    webhookEventRepository.save(event);
+                    return;
+                }
+
+                Long orderId = Long.parseLong(orderIdStr);
+                orderService.markOrderAsPending(orderId);
             }
 
             event.setStatus(WebhookEventStatus.PROCESSED);
