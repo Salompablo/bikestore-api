@@ -16,6 +16,9 @@ public record OrderItemResponse(
         Integer quantity,
 
         @Schema(description = "Price per unit at the time of purchase", example = "850000.00")
-        BigDecimal unitPrice
+        BigDecimal unitPrice,
+
+        @Schema(description = "URL of the product's first image", example = "https://bucket.s3.amazonaws.com/image1.jpg")
+        String imageUrl
 ) {
 }
