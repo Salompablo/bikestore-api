@@ -39,11 +39,13 @@ public class OrderMapper {
             return null;
         }
 
+        List<String> images = item.getProduct().getImages();
         return new OrderItemResponse(
                 item.getProduct().getId(),
                 item.getProduct().getName(),
                 item.getQuantity(),
-                item.getUnitPrice()
+                item.getUnitPrice(),
+                images.isEmpty() ? null : images.get(0)
         );
     }
 }
