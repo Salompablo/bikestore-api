@@ -27,7 +27,7 @@ public class UserController {
 
     private final UserService userService;
 
-    @Operation(summary = "Get my profile", description = "Returns the authenticated user's own profile information.")
+    @Operation(summary = "Get my profile", description = "Retrieves the authenticated user's own profile information.")
     @ApiResponse(responseCode = "200", description = "Profile retrieved successfully",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class)))
     @ApiCustomerErrors

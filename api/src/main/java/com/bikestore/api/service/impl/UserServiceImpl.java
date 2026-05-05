@@ -46,7 +46,6 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public UserResponse getMyProfile(User user) {
         return userMapper.toResponse(user);
     }
