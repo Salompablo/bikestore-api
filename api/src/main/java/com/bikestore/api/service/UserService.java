@@ -8,4 +8,5 @@ import org.springframework.data.domain.Pageable;
 public interface UserService {
     void deactivateUser(User user);
     Page<UserResponse> getAllUsers(Pageable pageable);
+    void updateDefaultPhone(User user, String phone);
 }

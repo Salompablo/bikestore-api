@@ -30,7 +30,8 @@ public class OrderMapper {
                 order.getShippingAddress(),
                 order.getZipCode(),
                 order.getShippingCost(),
-                order.getTrackingNumber()
+                order.getTrackingNumber(),
+                order.getContactPhone()
         );
     }
 

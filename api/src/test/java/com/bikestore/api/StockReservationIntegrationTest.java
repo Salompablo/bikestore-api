@@ -114,7 +114,9 @@ class StockReservationIntegrationTest {
         return new CheckoutRequest(
                 List.of(new CartItemRequest(productId, qty)),
                 DeliveryMethod.STORE_PICKUP,
-                null, null, null
+                null, null, null,
+                "+5492235550000",
+                false
         );
     }
 

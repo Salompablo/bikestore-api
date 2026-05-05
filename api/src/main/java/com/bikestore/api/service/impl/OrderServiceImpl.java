@@ -165,6 +165,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setTotalAmount(totalAmount);
+        order.setContactPhone(checkoutRequest.contactPhone());
         Order savedOrder = orderRepository.save(order);
 
         for (StockReservation reservation : reservations) {

@@ -4,6 +4,7 @@ import com.bikestore.api.entity.enums.DeliveryMethod;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
@@ -29,6 +30,13 @@ public record CheckoutRequest(
 
         @Schema(description = "Calculated shipping cost (required when deliveryMethod is SHIPPING, ignored for STORE_PICKUP)", example = "15000.00")
         @Min(value = 0, message = "Shipping cost cannot be negative")
-        BigDecimal shippingCost
+        BigDecimal shippingCost,
+
+        @Schema(description = "Contact phone number for order notifications", example = "+5492235551234")
+        @NotBlank(message = "Contact phone is required")
+        String contactPhone,
+
+        @Schema(description = "If true, saves the phone number as the user's default phone in their profile", example = "false")
+        boolean savePhoneToProfile
 ) {
 }

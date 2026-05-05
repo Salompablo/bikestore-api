@@ -45,7 +45,8 @@ public class UserMapper {
                 user.getRole() != null ? user.getRole().name() : null,
                 user.getIsActive(),
                 user.getIsEmailVerified(),
-                user.getProvider() != null ? user.getProvider().name() : null
+                user.getProvider() != null ? user.getProvider().name() : null,
+                user.getDefaultPhone()
         );
     }
 

@@ -52,6 +52,9 @@ public class User implements UserDetails {
     @Column(name = "reset_password_expires_at")
     private LocalDateTime resetPasswordExpiresAt;
 
+    @Column(name = "default_phone")
+    private String defaultPhone;
+
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private AuthProvider provider = AuthProvider.LOCAL;

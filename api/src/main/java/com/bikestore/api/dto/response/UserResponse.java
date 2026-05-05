@@ -26,6 +26,9 @@ public record UserResponse(
         Boolean isEmailVerified,
 
         @Schema(description = "Authentication provider (LOCAL or GOOGLE)", example = "LOCAL")
-        String provider
+        String provider,
+
+        @Schema(description = "User's default contact phone number", example = "+5492235551234")
+        String defaultPhone
 ) {
 }
