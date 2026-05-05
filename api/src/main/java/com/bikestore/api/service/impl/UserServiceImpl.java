@@ -44,4 +44,10 @@ public class UserServiceImpl implements UserService {
         existingUser.setDefaultPhone(phone);
         userRepository.save(existingUser);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponse getMyProfile(User user) {
+        return userMapper.toResponse(user);
+    }
 }
