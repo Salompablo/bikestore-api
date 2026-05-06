@@ -1,10 +1,13 @@
 package com.bikestore.api.controller;
 
 import com.bikestore.api.annotation.ApiCustomerErrors;
+import com.bikestore.api.dto.response.UserResponse;
 import com.bikestore.api.entity.User;
 import com.bikestore.api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,6 +26,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+
+    @Operation(summary = "Get my profile", description = "Retrieves the authenticated user's own profile information.")
+    @ApiResponse(responseCode = "200", description = "Profile retrieved successfully",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class)))
+    @ApiCustomerErrors
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> getMyProfile(
+            @Parameter(hidden = true) @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(userService.getMyProfile(user));
+    }
 
     @Operation(summary = "Deactivate my account", description = "Logically deletes the authenticated user's account. Requires CUSTOMER or ADMIN privileges.")
     @ApiResponse(responseCode = "204", description = "Account successfully deactivated")

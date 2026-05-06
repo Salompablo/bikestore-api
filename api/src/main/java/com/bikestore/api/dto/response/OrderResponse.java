@@ -36,6 +36,9 @@ public record OrderResponse(
         BigDecimal shippingCost,
 
         @Schema(description = "Logistics tracking number", example = "AR-987654321")
-        String trackingNumber
+        String trackingNumber,
+
+        @Schema(description = "Contact phone number provided at checkout", example = "+5492235551234")
+        String contactPhone
 ) {
 }

@@ -35,4 +35,18 @@ public class UserServiceImpl implements UserService {
         return userRepository.findAll(pageable)
                 .map(userMapper::toResponse);
     }
+
+    @Override
+    @Transactional
+    public void updateDefaultPhone(User user, String phone) {
+        User existingUser = userRepository.findById(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        existingUser.setDefaultPhone(phone);
+        userRepository.save(existingUser);
+    }
+
+    @Override
+    public UserResponse getMyProfile(User user) {
+        return userMapper.toResponse(user);
+    }
 }

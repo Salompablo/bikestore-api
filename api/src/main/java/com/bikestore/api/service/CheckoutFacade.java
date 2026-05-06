@@ -22,9 +22,15 @@ public class CheckoutFacade {
     private final WebhookEventRepository webhookEventRepository;
     private final PaymentGatewayService paymentGatewayService;
     private final OrderService orderService;
+    private final UserService userService;
 
     public CheckoutResponse initializeCheckout(CheckoutRequest request, User authenticatedUser) {
         Order order = orderService.createPendingOrder(request, authenticatedUser);
+
+        if (request.savePhoneToProfile()) {
+            userService.updateDefaultPhone(authenticatedUser, request.contactPhone());
+        }
+
         try {
             CheckoutInfo checkoutInfo = paymentGatewayService.createPreference(order);
             orderService.updateOrderPreference(order.getId(), checkoutInfo.preferenceId());
