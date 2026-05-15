@@ -7,6 +7,7 @@ import com.resend.services.emails.model.CreateEmailOptions;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 import java.util.stream.Collectors;
 
@@ -113,7 +114,7 @@ public class EmailService {
         Resend resend = new Resend(resendApiKey);
 
         String productsHtml = orderData.items().stream()
-                .map(item -> "<li>" + item.productName() + " x" + item.quantity() + "</li>")
+                .map(item -> "<li>" + HtmlUtils.htmlEscape(item.productName()) + " x" + item.quantity() + "</li>")
                 .collect(Collectors.joining());
 
         String deliveryMethod = orderData.deliveryMethod() == DeliveryMethod.SHIPPING ? "Envío" : "Retiro";
@@ -132,9 +133,9 @@ public class EmailService {
                         "<p><strong>Total:</strong> $%s</p>" +
                         "<p><strong>Método de entrega:</strong> %s</p>",
                 orderData.orderId(),
-                orderData.customerFullName(),
-                orderData.customerEmail(),
-                contactPhone,
+                HtmlUtils.htmlEscape(orderData.customerFullName()),
+                HtmlUtils.htmlEscape(orderData.customerEmail()),
+                HtmlUtils.htmlEscape(contactPhone),
                 productsHtml,
                 orderData.totalAmount(),
                 deliveryMethod
