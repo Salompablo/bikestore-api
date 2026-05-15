@@ -1,5 +1,6 @@
 package com.bikestore.api.service;
 
+import com.bikestore.api.dto.data.CustomerOrderConfirmationData;
 import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.event.OrderPaidNotificationData;
 import com.resend.Resend;
@@ -9,7 +10,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;
 
+import java.math.BigDecimal;
+import java.net.URI;
+import java.text.NumberFormat;
+import java.util.Currency;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @Slf4j
@@ -17,6 +26,15 @@ public class EmailService {
 
     @Value("${resend.api.key}")
     private String resendApiKey;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
+    @Value("${app.store.address}")
+    private String storeAddress;
+
+    @Value("${app.email.placeholder-image-url:}")
+    private String placeholderImageUrl;
 
     // -------------------------------------------------------------------------
     // Public send methods
@@ -147,6 +165,58 @@ public class EmailService {
         }
     }
 
+    public void sendCustomerOrderConfirmation(CustomerOrderConfirmationData data) {
+        String customerName = safeText(data.customerName(), "Cliente");
+        String orderDetailUrl = buildFrontendUrl("/orders/" + data.orderId());
+        String contactUrl = buildFrontendUrl("/contacto");
+        String deliverySummary = buildDeliverySummary(data);
+        String imageGroup = buildProductPreviewImages(data.productPreviewImages());
+
+        String content = String.format(
+                "<div style=\"text-align:center;padding-top:8px;\">" +
+                "<div style=\"width:64px;height:64px;border-radius:50%%;background-color:#22c55e;margin:0 auto 16px auto;" +
+                "line-height:64px;text-align:center;font-size:34px;font-weight:bold;color:#ffffff;\">&#10003;</div>" +
+                "<h1 style=\"margin:0 0 10px 0;font-size:28px;line-height:1.2;color:#111827;font-weight:700;\">" +
+                "&#161;Gracias por tu compra, %s!</h1>" +
+                "<p style=\"margin:0 0 24px 0;font-size:16px;line-height:1.5;color:#4b5563;\">" +
+                "Tu pago fue confirmado con &eacute;xito y ya estamos preparando tu pedido.</p>" +
+                "%s" +
+                "<div style=\"margin:0 0 24px 0;padding:20px;border:1px solid #e5e7eb;border-radius:12px;background-color:#f9fafb;text-align:left;\">" +
+                "<p style=\"margin:0 0 10px 0;font-size:14px;color:#6b7280;\">Orden</p>" +
+                "<p style=\"margin:0 0 16px 0;font-size:24px;color:#111827;font-weight:700;\">#%d</p>" +
+                "<p style=\"margin:0 0 8px 0;font-size:14px;color:#6b7280;\">Total abonado</p>" +
+                "<p style=\"margin:0 0 18px 0;font-size:30px;color:#111827;font-weight:700;\">%s</p>" +
+                "<p style=\"margin:0 0 6px 0;font-size:14px;color:#6b7280;\">Entrega</p>" +
+                "<p style=\"margin:0;font-size:16px;line-height:1.5;color:#374151;font-weight:600;\">%s</p>" +
+                "</div>" +
+                "<div style=\"text-align:center;margin:0 0 28px 0;\">" +
+                "<a href=\"%s\" style=\"display:inline-block;background-color:#1f2937;color:#ffffff;font-size:16px;" +
+                "font-weight:700;text-decoration:none;padding:14px 28px;border-radius:999px;\">Ver detalle y estado</a>" +
+                "</div>" +
+                "<p style=\"margin:0 0 10px 0;font-size:14px;line-height:1.6;color:#374151;text-align:center;\">" +
+                "Si ten&eacute;s un problema, estamos para ayudarte. " +
+                "<a href=\"%s\" style=\"color:#1f2937;font-weight:700;text-decoration:none;\">Contactanos</a></p>" +
+                "<p style=\"margin:0;font-size:12px;line-height:1.6;color:#9ca3af;text-align:center;\">" +
+                "Te enviamos este correo porque el e-mail %s est&aacute; asociado a una cuenta de Bikes Asaro.</p>" +
+                "</div>",
+                HtmlUtils.htmlEscape(customerName),
+                imageGroup,
+                data.orderId(),
+                formatCurrency(data.totalAmount()),
+                deliverySummary,
+                orderDetailUrl,
+                contactUrl,
+                HtmlUtils.htmlEscape(safeText(data.customerEmail(), "sin-email"))
+        );
+
+        sendHtmlEmail(
+                data.customerEmail(),
+                "Compra confirmada en Bikes Asaro #" + data.orderId(),
+                buildEmailTemplate("Compra confirmada", content)
+        );
+        log.info("✅ Customer order confirmation email processed for order {}", data.orderId());
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
@@ -178,23 +248,21 @@ public class EmailService {
                "<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background-color:#ffffff;" +
                "border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow:hidden;\">" +
 
-               // Header
                "<tr><td style=\"background-color:#1f2937;padding:24px 32px;border-bottom:4px solid #facc15;\">" +
                "<span style=\"font-size:22px;font-weight:bold;color:#facc15;letter-spacing:1px;\">Bikes Asaro</span>" +
                "</td></tr>" +
 
-               // Title bar
                "<tr><td style=\"padding:24px 32px 0 32px;\">" +
                "<h2 style=\"margin:0 0 16px 0;font-size:20px;color:#1f2937;border-bottom:2px solid #facc15;padding-bottom:10px;\">" +
                HtmlUtils.htmlEscape(title) + "</h2>" +
                "</td></tr>" +
 
-               // Content
                "<tr><td style=\"padding:0 32px 32px 32px;\">" + content + "</td></tr>" +
 
-               // Footer
                "<tr><td style=\"background-color:#f3f4f6;padding:16px 32px;border-top:1px solid #e5e7eb;text-align:center;\">" +
-               "<p style=\"margin:0 0 4px 0;font-size:12px;color:#6b7280;\">Bikes Asaro &mdash; Santa Fe 2611, Mar del Plata, Provincia de Buenos Aires</p>" +
+               "<p style=\"margin:0 0 4px 0;font-size:12px;color:#6b7280;\">Bikes Asaro &mdash; " +
+               HtmlUtils.htmlEscape(safeText(storeAddress, "Santa Fe 2611, Mar del Plata, Provincia de Buenos Aires")) +
+               "</p>" +
                "<p style=\"margin:0;font-size:12px;color:#9ca3af;\">Este es un correo automático, por favor no respondas a este mensaje.</p>" +
                "</td></tr>" +
 
@@ -210,5 +278,92 @@ public class EmailService {
                HtmlUtils.htmlEscape(code) +
                "</span>" +
                "</div>";
+    }
+
+    private String buildProductPreviewImages(List<String> productPreviewImages) {
+        List<String> sanitizedImages = productPreviewImages == null
+                ? List.of()
+                : productPreviewImages.stream()
+                .map(this::sanitizeHttpUrl)
+                .filter(Objects::nonNull)
+                .limit(3)
+                .toList();
+
+        if (sanitizedImages.isEmpty()) {
+            String placeholder = sanitizeHttpUrl(placeholderImageUrl);
+            if (placeholder == null) {
+                return "";
+            }
+            sanitizedImages = List.of(placeholder);
+        }
+
+        List<String> previewImages = sanitizedImages;
+        return "<div style=\"text-align:center;margin:0 0 24px 0;\"><div style=\"display:inline-block;\">" +
+                IntStream.range(0, previewImages.size())
+                        .mapToObj(index -> String.format(
+                                "<img src=\"%s\" alt=\"Producto %d\" width=\"60\" height=\"60\" " +
+                                "style=\"width:60px;height:60px;border-radius:50%%;border:3px solid #ffffff;" +
+                                "object-fit:cover;display:inline-block;vertical-align:middle;%s\" />",
+                                previewImages.get(index),
+                                index + 1,
+                                index == 0 ? "" : "margin-left:-20px;"
+                        ))
+                        .collect(Collectors.joining()) +
+                "</div></div>";
+    }
+
+    private String buildDeliverySummary(CustomerOrderConfirmationData data) {
+        if (data.deliveryMethod() == DeliveryMethod.SHIPPING) {
+            String address = safeText(data.shippingAddress(), "Dirección no disponible");
+            String zipCode = safeText(data.zipCode(), "");
+            String fullAddress = zipCode.isBlank() ? address : address + " (" + zipCode + ")";
+            return "Envío a domicilio<br><span style=\"font-weight:400;color:#4b5563;\">" +
+                    HtmlUtils.htmlEscape(fullAddress) + "</span>";
+        }
+
+        return "Retiro en local<br><span style=\"font-weight:400;color:#4b5563;\">" +
+                HtmlUtils.htmlEscape(safeText(storeAddress, "Dirección de tienda no disponible")) + "</span>";
+    }
+
+    private String buildFrontendUrl(String path) {
+        String normalizedBase = frontendUrl == null ? "" : frontendUrl.trim();
+        if (normalizedBase.endsWith("/")) {
+            normalizedBase = normalizedBase.substring(0, normalizedBase.length() - 1);
+        }
+
+        String normalizedPath = path.startsWith("/") ? path : "/" + path;
+        String absoluteUrl = normalizedBase + normalizedPath;
+        String sanitizedUrl = sanitizeHttpUrl(absoluteUrl);
+        return sanitizedUrl != null ? sanitizedUrl : "#";
+    }
+
+    private String sanitizeHttpUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+
+        try {
+            URI uri = URI.create(url.trim());
+            String scheme = uri.getScheme();
+            if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
+                return null;
+            }
+            return HtmlUtils.htmlEscape(uri.toString());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String formatCurrency(BigDecimal amount) {
+        NumberFormat currencyFormatter = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-AR"));
+        currencyFormatter.setCurrency(Currency.getInstance("ARS"));
+        return HtmlUtils.htmlEscape(currencyFormatter.format(amount == null ? BigDecimal.ZERO : amount));
+    }
+
+    private String safeText(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        return value.trim();
     }
 }
