@@ -1,6 +1,7 @@
 package com.bikestore.api.controller;
 
 import com.bikestore.api.annotation.ApiCustomerErrors;
+import com.bikestore.api.annotation.ApiNotFound;
 import com.bikestore.api.dto.response.OrderResponse;
 import com.bikestore.api.dto.response.PageResponse;
 import com.bikestore.api.entity.User;
@@ -69,6 +70,20 @@ public class OrderController {
 
         Page<OrderResponse> springPage = orderService.getMyOrders(authenticatedUser, pageable);
         return ResponseEntity.ok(PageResponse.of(springPage));
+    }
+
+    @Operation(summary = "Get my order by ID", description = "Retrieves the details of a specific order placed by the currently authenticated customer. Returns 404 if the order does not exist or does not belong to the user. Requires CUSTOMER privileges.")
+    @ApiResponse(responseCode = "200", description = "Order successfully retrieved")
+    @ApiNotFound
+    @ApiCustomerErrors
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @GetMapping("/my-orders/{id}")
+    public ResponseEntity<OrderResponse> getMyOrderById(
+            @Parameter(description = "Order ID", example = "1")
+            @PathVariable Long id,
+            @Parameter(hidden = true) @AuthenticationPrincipal User authenticatedUser) {
+
+        return ResponseEntity.ok(orderService.getMyOrderById(id, authenticatedUser));
     }
 
     @Operation(summary = "Cancel an order", description = "Cancels an order that is still in INITIATED or PENDING status, releasing the stock reservations. Requires CUSTOMER privileges.")
