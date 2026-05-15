@@ -58,6 +58,23 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
+    public OrderResponse getMyOrderById(Long id, User authenticatedUser) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
+
+        if (!order.getUser().getId().equals(authenticatedUser.getId())) {
+            throw new ResourceNotFoundException("Order not found with id: " + id);
+        }
+
+        if (HIDDEN_FROM_USER.contains(order.getStatus())) {
+            throw new ResourceNotFoundException("Order not found with id: " + id);
+        }
+
+        return orderMapper.toOrderResponse(order);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getAllOrders(Pageable pageable) {
         return orderRepository.findAll(pageable)
                 .map(orderMapper::toOrderResponse);

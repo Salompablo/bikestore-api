@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 
 public interface OrderService {
     Page<OrderResponse> getMyOrders(User authenticatedUser, Pageable pageable);
+    OrderResponse getMyOrderById(Long id, User authenticatedUser);
     Page<OrderResponse> getAllOrders(Pageable pageable);
     OrderResponse updateOrderStatus(Long id, OrderStatus newStatus);
     Order createPendingOrder(CheckoutRequest checkoutRequest, User authenticatedUser);

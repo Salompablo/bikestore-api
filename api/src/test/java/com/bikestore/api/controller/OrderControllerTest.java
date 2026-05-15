@@ -3,6 +3,7 @@ package com.bikestore.api.controller;
 import com.bikestore.api.dto.response.OrderResponse;
 import com.bikestore.api.dto.response.PageResponse;
 import com.bikestore.api.entity.User;
+import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.service.OrderService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,6 +38,8 @@ class OrderControllerTest {
 
     private static final Page<OrderResponse> EMPTY_PAGE = new PageImpl<>(List.of());
     private static final User DUMMY_USER = User.builder().build();
+    private static final OrderResponse DUMMY_ORDER = new OrderResponse(
+            1L, "PAID", "SHIPPING", null, null, List.of(), null, null, null, null, null);
 
     // ── getMyOrders ───────────────────────────────────────────────────────────
 
@@ -141,6 +144,35 @@ class OrderControllerTest {
                     values.get(0).getSort().iterator().next().getDirection(),
                     values.get(1).getSort().iterator().next().getDirection()
             );
+        }
+    }
+
+    // ── getMyOrderById ────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("GET /api/v1/orders/my-orders/{id} (getMyOrderById)")
+    class GetMyOrderById {
+
+        @Test
+        @DisplayName("returns 200 OK with the order when it belongs to the user")
+        void returns200_whenOrderBelongsToUser() {
+            when(orderService.getMyOrderById(1L, DUMMY_USER)).thenReturn(DUMMY_ORDER);
+
+            ResponseEntity<OrderResponse> response = controller.getMyOrderById(1L, DUMMY_USER);
+
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+            assertEquals(DUMMY_ORDER, response.getBody());
+            verify(orderService).getMyOrderById(1L, DUMMY_USER);
+        }
+
+        @Test
+        @DisplayName("propagates ResourceNotFoundException when order not found or not owned")
+        void propagatesNotFound_whenOrderNotFoundOrNotOwned() {
+            when(orderService.getMyOrderById(99L, DUMMY_USER))
+                    .thenThrow(new ResourceNotFoundException("Order not found with id: 99"));
+
+            assertThrows(ResourceNotFoundException.class,
+                    () -> controller.getMyOrderById(99L, DUMMY_USER));
         }
     }
 }
