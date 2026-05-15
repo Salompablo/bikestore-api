@@ -12,6 +12,8 @@ import com.bikestore.api.entity.User;
 import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.entity.enums.OrderStatus;
 import com.bikestore.api.entity.enums.ReservationStatus;
+import com.bikestore.api.event.AdminOrderNotificationEvent;
+import com.bikestore.api.event.OrderPaidNotificationData;
 import com.bikestore.api.exception.ConflictException;
 import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.mapper.OrderMapper;
@@ -21,6 +23,7 @@ import com.bikestore.api.repository.StockReservationRepository;
 import com.bikestore.api.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -44,6 +47,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final ProductRepository productRepository;
     private final StockReservationRepository stockReservationRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final int RESERVATION_TTL_MINUTES = 10;
     private static final Set<OrderStatus> CANCELLABLE_STATUSES = EnumSet.of(OrderStatus.INITIATED, OrderStatus.PENDING);
@@ -234,6 +238,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(OrderStatus.PAID);
         orderRepository.save(order);
+        eventPublisher.publishEvent(new AdminOrderNotificationEvent(this, buildOrderPaidNotificationData(order)));
 
         log.info("Order {} confirmed as PAID. {} reservation(s) consumed.", orderId, activeReservations.size());
     }
@@ -342,5 +347,31 @@ public class OrderServiceImpl implements OrderService {
                     String.format("Cannot transition order %d from %s to %s (delivery method: %s)",
                             order.getId(), current, newStatus, method));
         }
+    }
+
+    private OrderPaidNotificationData buildOrderPaidNotificationData(Order order) {
+        String firstName = order.getUser().getFirstName() == null ? "" : order.getUser().getFirstName().trim();
+        String lastName = order.getUser().getLastName() == null ? "" : order.getUser().getLastName().trim();
+        String fullName = (firstName + " " + lastName).trim();
+
+        if (fullName.isBlank()) {
+            fullName = "Cliente sin nombre";
+        }
+
+        List<OrderPaidNotificationData.OrderPaidItemData> items = order.getItems().stream()
+                .map(item -> new OrderPaidNotificationData.OrderPaidItemData(
+                        item.getProduct().getName(),
+                        item.getQuantity()))
+                .toList();
+
+        return new OrderPaidNotificationData(
+                order.getId(),
+                fullName,
+                order.getUser().getEmail(),
+                order.getContactPhone(),
+                items,
+                order.getTotalAmount(),
+                order.getDeliveryMethod()
+        );
     }
 }
