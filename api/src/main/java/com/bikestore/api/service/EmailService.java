@@ -294,7 +294,11 @@ public class EmailService {
             if (placeholder == null) {
                 return "";
             }
-            sanitizedImages = List.of(placeholder);
+            return "<div style=\"text-align:center;margin:0 0 24px 0;\">" +
+                    "<img src=\"" + placeholder + "\" alt=\"Imagen no disponible\" width=\"160\" height=\"160\" " +
+                    "style=\"width:160px;height:160px;border-radius:12px;object-fit:cover;" +
+                    "display:inline-block;border:2px solid #e5e7eb;background-color:#f3f4f6;\" />" +
+                    "</div>";
         }
 
         List<String> previewImages = sanitizedImages;
