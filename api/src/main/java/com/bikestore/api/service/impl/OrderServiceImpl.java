@@ -1,5 +1,6 @@
 package com.bikestore.api.service.impl;
 
+import com.bikestore.api.dto.data.CustomerOrderConfirmationData;
 import com.bikestore.api.dto.request.CartItemRequest;
 import com.bikestore.api.dto.request.CheckoutRequest;
 import com.bikestore.api.dto.response.OrderItemResponse;
@@ -13,6 +14,7 @@ import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.entity.enums.OrderStatus;
 import com.bikestore.api.entity.enums.ReservationStatus;
 import com.bikestore.api.event.AdminOrderNotificationEvent;
+import com.bikestore.api.event.CustomerOrderConfirmationEvent;
 import com.bikestore.api.event.OrderPaidNotificationData;
 import com.bikestore.api.exception.ConflictException;
 import com.bikestore.api.exception.ResourceNotFoundException;
@@ -35,6 +37,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -238,7 +241,10 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(OrderStatus.PAID);
         orderRepository.save(order);
-        eventPublisher.publishEvent(new AdminOrderNotificationEvent(this, buildOrderPaidNotificationData(order)));
+        OrderPaidNotificationData adminNotificationData = buildOrderPaidNotificationData(order);
+        CustomerOrderConfirmationData customerConfirmationData = buildCustomerOrderConfirmationData(order);
+        eventPublisher.publishEvent(new AdminOrderNotificationEvent(this, adminNotificationData));
+        eventPublisher.publishEvent(new CustomerOrderConfirmationEvent(this, customerConfirmationData));
 
         log.info("Order {} confirmed as PAID. {} reservation(s) consumed.", orderId, activeReservations.size());
     }
@@ -373,5 +379,53 @@ public class OrderServiceImpl implements OrderService {
                 order.getTotalAmount(),
                 order.getDeliveryMethod()
         );
+    }
+
+    private CustomerOrderConfirmationData buildCustomerOrderConfirmationData(Order order) {
+        String firstName = order.getUser().getFirstName() == null ? "" : order.getUser().getFirstName().trim();
+        String lastName = order.getUser().getLastName() == null ? "" : order.getUser().getLastName().trim();
+        String fullName = (firstName + " " + lastName).trim();
+
+        if (fullName.isBlank()) {
+            fullName = "Cliente";
+        }
+
+        List<String> productPreviewImages = order.getItems().stream()
+                .map(OrderItem::getProduct)
+                .filter(Objects::nonNull)
+                .map(this::resolveProductPreviewImage)
+                .filter(Objects::nonNull)
+                .limit(3)
+                .toList();
+
+        return new CustomerOrderConfirmationData(
+                order.getId(),
+                fullName,
+                order.getUser().getEmail(),
+                productPreviewImages,
+                order.getTotalAmount(),
+                order.getDeliveryMethod(),
+                order.getDeliveryMethod() == DeliveryMethod.SHIPPING ? order.getShippingAddress() : null,
+                order.getDeliveryMethod() == DeliveryMethod.SHIPPING ? order.getZipCode() : null
+        );
+    }
+
+    private String resolveProductPreviewImage(Product product) {
+        if (product.getImages() != null) {
+            for (String image : product.getImages()) {
+                if (image != null && !image.isBlank()) {
+                    return image;
+                }
+            }
+        }
+
+        if (product.getCategory() != null) {
+            String defaultImageUrl = product.getCategory().getDefaultImageUrl();
+            if (defaultImageUrl != null && !defaultImageUrl.isBlank()) {
+                return defaultImageUrl;
+            }
+        }
+
+        return null;
     }
 }
