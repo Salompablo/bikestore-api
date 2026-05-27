@@ -86,7 +86,7 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getMyOrderById(id, authenticatedUser));
     }
 
-    @Operation(summary = "Cancel an order", description = "Cancels an order that is still in INITIATED or PENDING status, releasing the stock reservations. Requires CUSTOMER privileges.")
+    @Operation(summary = "Cancel an order", description = "Cancels an active order before fulfillment, releasing stock reservations. Requires CUSTOMER privileges.")
     @ApiResponse(responseCode = "204", description = "Order successfully cancelled")
     @ApiCustomerErrors
     @PreAuthorize("hasRole('CUSTOMER')")

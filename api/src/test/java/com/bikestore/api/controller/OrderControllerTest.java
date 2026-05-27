@@ -39,7 +39,8 @@ class OrderControllerTest {
     private static final Page<OrderResponse> EMPTY_PAGE = new PageImpl<>(List.of());
     private static final User DUMMY_USER = User.builder().build();
     private static final OrderResponse DUMMY_ORDER = new OrderResponse(
-            1L, "PAID", "SHIPPING", null, null, List.of(), null, null, null, null, null);
+            1L, "PAID", "SHIPPING", null, null, List.of(), null, null, null, null, null,
+            "APPROVED", "pref-1", false, true);
 
     // ── getMyOrders ───────────────────────────────────────────────────────────
 

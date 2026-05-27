@@ -39,6 +39,18 @@ public record OrderResponse(
         String trackingNumber,
 
         @Schema(description = "Contact phone number provided at checkout", example = "+5492235551234")
-        String contactPhone
+        String contactPhone,
+
+        @Schema(description = "Payment status of the order", example = "PENDING")
+        String paymentStatus,
+
+        @Schema(description = "Mercado Pago preference ID when available", example = "3226905474-059535ac-abe2-4a30-97be-46cf815c92b6")
+        String preferenceId,
+
+        @Schema(description = "True when order is waiting for manual shipping quote", example = "false")
+        boolean requiresShippingQuote,
+
+        @Schema(description = "True when customer can proceed with payment", example = "true")
+        boolean payableNow
 ) {
 }

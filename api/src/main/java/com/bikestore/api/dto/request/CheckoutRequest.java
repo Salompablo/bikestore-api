@@ -28,7 +28,7 @@ public record CheckoutRequest(
         @Schema(description = "Postal or ZIP code (required when deliveryMethod is SHIPPING)", example = "7600")
         String zipCode,
 
-        @Schema(description = "Calculated shipping cost (required when deliveryMethod is SHIPPING, ignored for STORE_PICKUP)", example = "15000.00")
+        @Schema(description = "Optional client-side shipping estimate. For SHIPPING this value is ignored because final quote is defined by admin.", example = "15000.00")
         @Min(value = 0, message = "Shipping cost cannot be negative")
         BigDecimal shippingCost,
 

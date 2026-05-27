@@ -4,6 +4,7 @@ import com.bikestore.api.dto.response.OrderItemResponse;
 import com.bikestore.api.dto.response.OrderResponse;
 import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.OrderItem;
+import com.bikestore.api.entity.enums.OrderStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -31,7 +32,11 @@ public class OrderMapper {
                 order.getZipCode(),
                 order.getShippingCost(),
                 order.getTrackingNumber(),
-                order.getContactPhone()
+                order.getContactPhone(),
+                order.getPaymentStatus().name(),
+                order.getPreferenceId(),
+                order.getStatus() == OrderStatus.QUOTE_REQUESTED,
+                order.getPreferenceId() != null && !order.getPreferenceId().isBlank()
         );
     }
 

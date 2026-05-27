@@ -12,6 +12,7 @@ import com.bikestore.api.entity.StockReservation;
 import com.bikestore.api.entity.User;
 import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.entity.enums.OrderStatus;
+import com.bikestore.api.entity.enums.PaymentStatus;
 import com.bikestore.api.entity.enums.ReservationStatus;
 import com.bikestore.api.event.AdminOrderNotificationEvent;
 import com.bikestore.api.event.CustomerOrderConfirmationEvent;
@@ -23,8 +24,10 @@ import com.bikestore.api.repository.OrderRepository;
 import com.bikestore.api.repository.ProductRepository;
 import com.bikestore.api.repository.StockReservationRepository;
 import com.bikestore.api.service.OrderService;
+import com.bikestore.api.service.OrderStatusTransitionPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -51,9 +54,20 @@ public class OrderServiceImpl implements OrderService {
     private final ProductRepository productRepository;
     private final StockReservationRepository stockReservationRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final OrderStatusTransitionPolicy transitionPolicy;
 
-    private static final int RESERVATION_TTL_MINUTES = 10;
-    private static final Set<OrderStatus> CANCELLABLE_STATUSES = EnumSet.of(OrderStatus.INITIATED, OrderStatus.PENDING);
+    @Value("${app.orders.reservation-ttl.pickup-minutes:10}")
+    private int pickupReservationTtlMinutes;
+
+    @Value("${app.orders.reservation-ttl.shipping-quote-hours:24}")
+    private int shippingQuoteReservationTtlHours;
+
+    private static final Set<OrderStatus> CANCELLABLE_STATUSES = EnumSet.of(
+            OrderStatus.INITIATED,
+            OrderStatus.PENDING,
+            OrderStatus.QUOTE_REQUESTED,
+            OrderStatus.QUOTE_READY_PAYMENT_PENDING
+    );
     private static final Set<OrderStatus> HIDDEN_FROM_USER = EnumSet.of(OrderStatus.INITIATED);
 
     @Override
@@ -113,9 +127,6 @@ public class OrderServiceImpl implements OrderService {
             if (checkoutRequest.zipCode() == null || checkoutRequest.zipCode().isBlank()) {
                 throw new IllegalArgumentException("ZIP code is required for delivery orders");
             }
-            if (checkoutRequest.shippingCost() == null || checkoutRequest.shippingCost().compareTo(BigDecimal.ZERO) < 0) {
-                throw new IllegalArgumentException("A valid shipping cost is required for delivery orders");
-            }
         }
 
         // Cancel any pre-existing active order for this user before creating a new one
@@ -129,7 +140,7 @@ public class OrderServiceImpl implements OrderService {
 
         Order order = new Order();
         order.setUser(authenticatedUser);
-        order.setStatus(OrderStatus.INITIATED);
+        order.setStatus(deliveryMethod == DeliveryMethod.SHIPPING ? OrderStatus.QUOTE_REQUESTED : OrderStatus.INITIATED);
         order.setDeliveryMethod(deliveryMethod);
 
         BigDecimal totalAmount = BigDecimal.ZERO;
@@ -140,7 +151,9 @@ public class OrderServiceImpl implements OrderService {
                         Collectors.summingInt(CartItemRequest::quantity)
                 ));
 
-        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(RESERVATION_TTL_MINUTES);
+        LocalDateTime expiresAt = deliveryMethod == DeliveryMethod.SHIPPING
+                ? LocalDateTime.now().plusHours(shippingQuoteReservationTtlHours)
+                : LocalDateTime.now().plusMinutes(pickupReservationTtlMinutes);
         List<StockReservation> reservations = new ArrayList<>();
 
         for (Map.Entry<Long, Integer> entry : consolidatedCart.entrySet()) {
@@ -156,7 +169,7 @@ public class OrderServiceImpl implements OrderService {
                 throw new ConflictException(
                         "Not enough stock for: " + product.getName(),
                         "RESERVED_TEMPORARILY",
-                        RESERVATION_TTL_MINUTES * 60
+                        pickupReservationTtlMinutes * 60
                 );
             }
 
@@ -177,11 +190,9 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if (deliveryMethod == DeliveryMethod.SHIPPING) {
-            BigDecimal shippingCost = checkoutRequest.shippingCost();
-            order.setShippingCost(shippingCost);
+            order.setShippingCost(BigDecimal.ZERO);
             order.setShippingAddress(checkoutRequest.shippingAddress());
             order.setZipCode(checkoutRequest.zipCode());
-            totalAmount = totalAmount.add(shippingCost);
         } else {
             order.setShippingCost(BigDecimal.ZERO);
             order.setShippingAddress(null);
@@ -197,8 +208,8 @@ public class OrderServiceImpl implements OrderService {
             stockReservationRepository.save(reservation);
         }
 
-        log.info("Order {} created in INITIATED state with {} reservation(s), expires at {}",
-                savedOrder.getId(), consolidatedCart.size(), expiresAt);
+        log.info("Order {} created in {} state with {} reservation(s), expires at {}",
+                savedOrder.getId(), savedOrder.getStatus(), consolidatedCart.size(), expiresAt);
         return savedOrder;
     }
 
@@ -213,11 +224,62 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public Order prepareShippingQuote(Long orderId, BigDecimal shippingCost) {
+        if (shippingCost == null || shippingCost.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Shipping cost must be non-negative");
+        }
+
+        Order order = orderRepository.findByIdWithLock(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
+
+        if (order.getDeliveryMethod() != DeliveryMethod.SHIPPING) {
+            throw new ConflictException("Shipping quote can only be published for SHIPPING orders");
+        }
+
+        if (order.getStatus() == OrderStatus.PAID
+                || order.getStatus() == OrderStatus.CANCELLED
+                || order.getStatus() == OrderStatus.SHIPPED
+                || order.getStatus() == OrderStatus.DELIVERED) {
+            throw new ConflictException("Cannot publish shipping quote for order in status: " + order.getStatus());
+        }
+
+        BigDecimal normalizedShippingCost = shippingCost.stripTrailingZeros();
+        BigDecimal currentShippingCost = order.getShippingCost() == null
+                ? BigDecimal.ZERO
+                : order.getShippingCost().stripTrailingZeros();
+
+        if (order.getStatus() == OrderStatus.QUOTE_READY_PAYMENT_PENDING
+                && normalizedShippingCost.compareTo(currentShippingCost) == 0
+                && order.getPreferenceId() != null
+                && !order.getPreferenceId().isBlank()) {
+            return order;
+        }
+
+        BigDecimal subtotal = order.getItems().stream()
+                .map(item -> item.getUnitPrice().multiply(new BigDecimal(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        order.setShippingCost(shippingCost);
+        order.setTotalAmount(subtotal.add(shippingCost));
+        order.setStatus(OrderStatus.QUOTE_READY_PAYMENT_PENDING);
+        order.setPaymentStatus(PaymentStatus.PENDING);
+
+        if (normalizedShippingCost.compareTo(currentShippingCost) != 0) {
+            order.setPreferenceId(null);
+        }
+
+        return orderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
     public void confirmOrder(Long orderId) {
         Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
 
-        if (order.getStatus() != OrderStatus.INITIATED && order.getStatus() != OrderStatus.PENDING) {
+        if (order.getStatus() != OrderStatus.INITIATED
+                && order.getStatus() != OrderStatus.PENDING
+                && order.getStatus() != OrderStatus.QUOTE_READY_PAYMENT_PENDING) {
             log.warn("Order {} is already {}. Skipping webhook confirmation.", orderId, order.getStatus());
             return;
         }
@@ -240,6 +302,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setStatus(OrderStatus.PAID);
+        order.setPaymentStatus(PaymentStatus.APPROVED);
         orderRepository.save(order);
         OrderPaidNotificationData adminNotificationData = buildOrderPaidNotificationData(order);
         CustomerOrderConfirmationData customerConfirmationData = buildCustomerOrderConfirmationData(order);
@@ -255,8 +318,8 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findByIdWithLock(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
 
-        if (order.getStatus() == OrderStatus.PENDING) {
-            log.info("Order {} is already PENDING. Skipping.", orderId);
+        if (order.getStatus() == OrderStatus.PENDING || order.getStatus() == OrderStatus.QUOTE_READY_PAYMENT_PENDING) {
+            log.info("Order {} is already in pending-payment flow ({}). Skipping.", orderId, order.getStatus());
             return;
         }
 
@@ -287,7 +350,7 @@ public class OrderServiceImpl implements OrderService {
             return;
         }
 
-        if (order.getStatus() != OrderStatus.INITIATED && order.getStatus() != OrderStatus.PENDING) {
+        if (!CANCELLABLE_STATUSES.contains(order.getStatus())) {
             throw new ConflictException(
                     "Cannot cancel order in status: " + order.getStatus());
         }
@@ -318,41 +381,16 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setStatus(OrderStatus.CANCELLED);
+        if (order.getPaymentStatus() != PaymentStatus.APPROVED) {
+            order.setPaymentStatus(PaymentStatus.CANCELLED);
+        }
         orderRepository.save(order);
 
         log.info("Order {} cancelled. {} reservation(s) released.", order.getId(), activeReservations.size());
     }
 
     private void validateStatusTransition(Order order, OrderStatus newStatus) {
-        OrderStatus current = order.getStatus();
-        DeliveryMethod method = order.getDeliveryMethod();
-
-        // CANCELLED is always allowed from any state
-        if (newStatus == OrderStatus.CANCELLED) {
-            return;
-        }
-
-        Set<OrderStatus> allowed;
-
-        if (method == DeliveryMethod.STORE_PICKUP) {
-            allowed = switch (current) {
-                case PAID -> EnumSet.of(OrderStatus.READY_FOR_PICKUP);
-                case READY_FOR_PICKUP -> EnumSet.of(OrderStatus.PICKED_UP);
-                default -> EnumSet.noneOf(OrderStatus.class);
-            };
-        } else {
-            allowed = switch (current) {
-                case PAID -> EnumSet.of(OrderStatus.SHIPPED);
-                case SHIPPED -> EnumSet.of(OrderStatus.DELIVERED);
-                default -> EnumSet.noneOf(OrderStatus.class);
-            };
-        }
-
-        if (!allowed.contains(newStatus)) {
-            throw new IllegalArgumentException(
-                    String.format("Cannot transition order %d from %s to %s (delivery method: %s)",
-                            order.getId(), current, newStatus, method));
-        }
+        transitionPolicy.validateTransition(order, newStatus);
     }
 
     private OrderPaidNotificationData buildOrderPaidNotificationData(Order order) {

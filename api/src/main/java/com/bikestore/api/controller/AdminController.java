@@ -2,7 +2,9 @@ package com.bikestore.api.controller;
 
 import com.bikestore.api.annotation.ApiAdminErrors;
 import com.bikestore.api.annotation.ApiNotFound;
+import com.bikestore.api.dto.request.ShippingQuoteApprovalRequest;
 import com.bikestore.api.dto.request.ShippingZoneRequest;
+import com.bikestore.api.dto.response.CheckoutResponse;
 import com.bikestore.api.dto.response.OrderResponse;
 import com.bikestore.api.dto.response.PageResponse;
 import com.bikestore.api.dto.response.ShippingZoneResponse;
@@ -14,6 +16,7 @@ import com.bikestore.api.mapper.ShippingZoneMapper;
 import com.bikestore.api.repository.ShippingZoneRepository;
 import com.bikestore.api.service.OrderService;
 import com.bikestore.api.service.UserService;
+import com.bikestore.api.service.CheckoutFacade;
 import com.bikestore.api.util.SortResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -62,6 +65,7 @@ public class AdminController {
     private final UserService userService;
     private final ShippingZoneRepository shippingZoneRepository;
     private final ShippingZoneMapper shippingZoneMapper;
+    private final CheckoutFacade checkoutFacade;
 
     @Operation(summary = "Get all orders", description = "Retrieves a paginated list of all orders in the system.")
     @ApiResponse(responseCode = "200", description = "Orders successfully retrieved")
@@ -96,6 +100,17 @@ public class AdminController {
             @Parameter(description = "Order ID", example = "1001") @PathVariable Long id,
             @Parameter(description = "New order status", example = "SHIPPED", required = true) @RequestParam OrderStatus status) {
         return ResponseEntity.ok(orderService.updateOrderStatus(id, status));
+    }
+
+    @Operation(summary = "Publish shipping quote", description = "Sets final shipping cost for a shipping order, recalculates total, and enables Mercado Pago payment.")
+    @ApiResponse(responseCode = "200", description = "Shipping quote published and payment enabled")
+    @ApiNotFound
+    @ApiAdminErrors
+    @PatchMapping("/orders/{id}/shipping-quote")
+    public ResponseEntity<CheckoutResponse> publishShippingQuote(
+            @PathVariable Long id,
+            @Valid @RequestBody ShippingQuoteApprovalRequest request) {
+        return ResponseEntity.ok(checkoutFacade.publishShippingQuote(id, request.shippingCost()));
     }
 
     @Operation(summary = "Get all users", description = "Retrieves a paginated list of all registered users.")
