@@ -33,7 +33,7 @@ public class EmailService {
     @Value("${app.store.address}")
     private String storeAddress;
 
-    @Value("${app.email.placeholder-image-url:}")
+    @Value("${app.email.placeholder-image-url}")
     private String placeholderImageUrl;
 
     // -------------------------------------------------------------------------
@@ -291,14 +291,18 @@ public class EmailService {
 
         if (sanitizedImages.isEmpty()) {
             String placeholder = sanitizeHttpUrl(placeholderImageUrl);
-            if (placeholder == null) {
+            if (placeholder == null || placeholder.isBlank()) {
+                placeholder = placeholderImageUrl;
+            }
+            if (placeholder == null || placeholder.isBlank()) {
                 return "";
             }
-            return "<div style=\"text-align:center;margin:0 0 24px 0;\">" +
-                    "<img src=\"" + placeholder + "\" alt=\"Imagen no disponible\" width=\"160\" height=\"160\" " +
-                    "style=\"width:160px;height:160px;border-radius:12px;object-fit:cover;" +
-                    "display:inline-block;border:2px solid #e5e7eb;background-color:#f3f4f6;\" />" +
-                    "</div>";
+
+            return "<div style=\"text-align:center;margin:0 0 24px 0;\"><div style=\"display:inline-block;\">" +
+                    "<img src=\"" + placeholder + "\" alt=\"Imagen referencial\" width=\"60\" height=\"60\" " +
+                    "style=\"width:60px;height:60px;border-radius:50%;border:3px solid #ffffff;" +
+                    "object-fit:cover;display:inline-block;vertical-align:middle;\" />" +
+                    "</div></div>";
         }
 
         List<String> previewImages = sanitizedImages;
@@ -306,8 +310,8 @@ public class EmailService {
                 IntStream.range(0, previewImages.size())
                         .mapToObj(index -> String.format(
                                 "<img src=\"%s\" alt=\"Producto %d\" width=\"60\" height=\"60\" " +
-                                "style=\"width:60px;height:60px;border-radius:50%%;border:3px solid #ffffff;" +
-                                "object-fit:cover;display:inline-block;vertical-align:middle;%s\" />",
+                                        "style=\"width:60px;height:60px;border-radius:50%%;border:3px solid #ffffff;" +
+                                        "object-fit:cover;display:inline-block;vertical-align:middle;%s\" />",
                                 previewImages.get(index),
                                 index + 1,
                                 index == 0 ? "" : "margin-left:-20px;"
