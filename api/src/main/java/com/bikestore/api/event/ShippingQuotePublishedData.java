@@ -7,7 +7,6 @@ public record ShippingQuotePublishedData(
         String customerName,
         String customerEmail,
         BigDecimal totalAmount,
-        BigDecimal shippingCost,
-        String paymentUrl
+        BigDecimal shippingCost
 ) {
 }

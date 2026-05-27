@@ -224,6 +224,7 @@ public class EmailService {
         String contactPhone = safeText(data.contactPhone(), "No informado");
         String shippingAddress = safeText(data.shippingAddress(), "No informado");
         String zipCode = safeText(data.zipCode(), "No informado");
+        String adminOrderUrl = buildFrontendUrl("/admin/orders/" + data.orderId());
 
         String content = String.format(
                 "<p style=\"margin:0 0 16px 0;font-size:16px;color:#374151;\">Hay una orden esperando cotización de envío.</p>" +
@@ -234,13 +235,18 @@ public class EmailService {
                         "<tr><td style=\"padding:8px 0;color:#6b7280;\">Teléfono</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
                         "<tr><td style=\"padding:8px 0;color:#6b7280;\">Dirección</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
                         "<tr><td style=\"padding:8px 0;color:#6b7280;\">Código postal</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
-                        "</table>",
+                        "</table>" +
+                        "<div style=\"text-align:center;margin:0 0 24px 0;\">" +
+                        "<a href=\"%s\" style=\"display:inline-block;background-color:#1f2937;color:#ffffff;font-size:16px;" +
+                        "font-weight:700;text-decoration:none;padding:14px 28px;border-radius:999px;\">Cotizar pedido</a>" +
+                        "</div>",
                 data.orderId(),
                 HtmlUtils.htmlEscape(customerName),
                 HtmlUtils.htmlEscape(safeText(data.customerEmail(), "No informado")),
                 HtmlUtils.htmlEscape(contactPhone),
                 HtmlUtils.htmlEscape(shippingAddress),
-                HtmlUtils.htmlEscape(zipCode)
+                HtmlUtils.htmlEscape(zipCode),
+                adminOrderUrl
         );
 
         sendHtmlEmail(
@@ -252,10 +258,7 @@ public class EmailService {
 
     public void sendCustomerShippingQuoteReady(ShippingQuotePublishedData data) {
         String customerName = safeText(data.customerName(), "Cliente");
-        String paymentUrl = sanitizeHttpUrl(data.paymentUrl());
-        if (paymentUrl == null || paymentUrl.isBlank()) {
-            paymentUrl = "#";
-        }
+        String orderDetailUrl = buildFrontendUrl("/orders/" + data.orderId());
 
         String content = String.format(
                 "<p style=\"margin:0 0 16px 0;font-size:16px;color:#374151;\">¡Hola %s! Ya cotizamos tu envío y tu pedido está listo para pagar.</p>" +
@@ -272,7 +275,7 @@ public class EmailService {
                 data.orderId(),
                 formatCurrency(data.shippingCost()),
                 formatCurrency(data.totalAmount()),
-                paymentUrl
+                orderDetailUrl
         );
 
         sendHtmlEmail(

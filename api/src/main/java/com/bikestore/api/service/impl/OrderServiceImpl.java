@@ -3,7 +3,7 @@ package com.bikestore.api.service.impl;
 import com.bikestore.api.dto.data.CustomerOrderConfirmationData;
 import com.bikestore.api.dto.request.CartItemRequest;
 import com.bikestore.api.dto.request.CheckoutRequest;
-import com.bikestore.api.dto.response.OrderItemResponse;
+import com.bikestore.api.dto.response.AdminOrderDetailResponse;
 import com.bikestore.api.dto.response.OrderResponse;
 import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.OrderItem;
@@ -99,6 +99,14 @@ public class OrderServiceImpl implements OrderService {
     public Page<OrderResponse> getAllOrders(Pageable pageable) {
         return orderRepository.findAll(pageable)
                 .map(orderMapper::toOrderResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminOrderDetailResponse getOrderByIdForAdmin(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
+        return orderMapper.toAdminOrderDetailResponse(order);
     }
 
     @Override

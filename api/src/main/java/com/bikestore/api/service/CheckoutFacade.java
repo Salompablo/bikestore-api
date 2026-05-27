@@ -73,8 +73,7 @@ public class CheckoutFacade {
                 fullName,
                 order.getUser().getEmail(),
                 order.getTotalAmount(),
-                order.getShippingCost(),
-                checkoutInfo.initPoint()
+                order.getShippingCost()
         )));
 
         return new CheckoutResponse(order.getId(), checkoutInfo.preferenceId(), checkoutInfo.initPoint(), false, true, "CHECKOUT_READY");
