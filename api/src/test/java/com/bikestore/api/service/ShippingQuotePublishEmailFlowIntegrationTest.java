@@ -115,7 +115,7 @@ class ShippingQuotePublishEmailFlowIntegrationTest {
         CheckoutResponse response = checkoutFacade.publishShippingQuote(orderId, BigDecimal.valueOf(1500));
 
         assertEquals(orderId, response.orderId());
-        assertFalse(response.waitingForShippingQuote());
+        assertFalse(response.requiresShippingQuote());
 
         verify(emailService, timeout(3000)).sendCustomerShippingQuoteReady(argThat(data ->
                 hasExpectedCustomerEmailData(data, orderId, testUser.getEmail())
