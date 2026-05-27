@@ -14,5 +14,14 @@ public record CheckoutResponse(
 
         @Schema(description = "URL to redirect the user to the Mercado Pago checkout screen",
                 example = "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=3226905474-0595...")
-        String initPoint
+        String initPoint,
+
+        @Schema(description = "True when shipping cost still needs to be manually quoted by admin", example = "false")
+        boolean requiresShippingQuote,
+
+        @Schema(description = "True when the order can be paid right now", example = "true")
+        boolean payableNow,
+
+        @Schema(description = "Business flow status for frontend UX states", example = "CHECKOUT_READY")
+        String flowStatus
 ) {}

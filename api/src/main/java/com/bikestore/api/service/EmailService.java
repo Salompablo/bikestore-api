@@ -2,6 +2,8 @@ package com.bikestore.api.service;
 
 import com.bikestore.api.dto.data.CustomerOrderConfirmationData;
 import com.bikestore.api.entity.enums.DeliveryMethod;
+import com.bikestore.api.event.ShippingQuotePublishedData;
+import com.bikestore.api.event.ShippingQuoteRequestedData;
 import com.bikestore.api.event.OrderPaidNotificationData;
 import com.resend.Resend;
 import com.resend.services.emails.model.CreateEmailOptions;
@@ -215,6 +217,69 @@ public class EmailService {
                 buildEmailTemplate("Compra confirmada", content)
         );
         log.info("✅ Customer order confirmation email processed for order {}", data.orderId());
+    }
+
+    public void sendAdminShippingQuoteRequest(String toEmail, ShippingQuoteRequestedData data) {
+        String customerName = safeText(data.customerName(), "Cliente sin nombre");
+        String contactPhone = safeText(data.contactPhone(), "No informado");
+        String shippingAddress = safeText(data.shippingAddress(), "No informado");
+        String zipCode = safeText(data.zipCode(), "No informado");
+
+        String content = String.format(
+                "<p style=\"margin:0 0 16px 0;font-size:16px;color:#374151;\">Hay una orden esperando cotización de envío.</p>" +
+                        "<table style=\"width:100%%;border-collapse:collapse;margin-bottom:24px;font-size:15px;\">" +
+                        "<tr><td style=\"padding:8px 0;color:#6b7280;width:40%%;\">Orden ID</td><td style=\"padding:8px 0;color:#374151;font-weight:bold;\">#%d</td></tr>" +
+                        "<tr><td style=\"padding:8px 0;color:#6b7280;\">Cliente</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
+                        "<tr><td style=\"padding:8px 0;color:#6b7280;\">Email</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
+                        "<tr><td style=\"padding:8px 0;color:#6b7280;\">Teléfono</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
+                        "<tr><td style=\"padding:8px 0;color:#6b7280;\">Dirección</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
+                        "<tr><td style=\"padding:8px 0;color:#6b7280;\">Código postal</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
+                        "</table>",
+                data.orderId(),
+                HtmlUtils.htmlEscape(customerName),
+                HtmlUtils.htmlEscape(safeText(data.customerEmail(), "No informado")),
+                HtmlUtils.htmlEscape(contactPhone),
+                HtmlUtils.htmlEscape(shippingAddress),
+                HtmlUtils.htmlEscape(zipCode)
+        );
+
+        sendHtmlEmail(
+                toEmail,
+                "Pedido pendiente de cotización #" + data.orderId(),
+                buildEmailTemplate("Cotización de envío pendiente", content)
+        );
+    }
+
+    public void sendCustomerShippingQuoteReady(ShippingQuotePublishedData data) {
+        String customerName = safeText(data.customerName(), "Cliente");
+        String paymentUrl = sanitizeHttpUrl(data.paymentUrl());
+        if (paymentUrl == null || paymentUrl.isBlank()) {
+            paymentUrl = "#";
+        }
+
+        String content = String.format(
+                "<p style=\"margin:0 0 16px 0;font-size:16px;color:#374151;\">¡Hola %s! Ya cotizamos tu envío y tu pedido está listo para pagar.</p>" +
+                        "<table style=\"width:100%%;border-collapse:collapse;margin-bottom:24px;font-size:15px;\">" +
+                        "<tr><td style=\"padding:8px 0;color:#6b7280;width:40%%;\">Orden ID</td><td style=\"padding:8px 0;color:#374151;font-weight:bold;\">#%d</td></tr>" +
+                        "<tr><td style=\"padding:8px 0;color:#6b7280;\">Envío</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
+                        "<tr><td style=\"padding:8px 0;color:#6b7280;\">Total final</td><td style=\"padding:8px 0;color:#374151;font-weight:bold;\">%s</td></tr>" +
+                        "</table>" +
+                        "<div style=\"text-align:center;margin:0 0 24px 0;\">" +
+                        "<a href=\"%s\" style=\"display:inline-block;background-color:#facc15;color:#111827;font-size:16px;" +
+                        "font-weight:700;text-decoration:none;padding:14px 28px;border-radius:999px;\">Ver detalle y pagar</a>" +
+                        "</div>",
+                HtmlUtils.htmlEscape(customerName),
+                data.orderId(),
+                formatCurrency(data.shippingCost()),
+                formatCurrency(data.totalAmount()),
+                paymentUrl
+        );
+
+        sendHtmlEmail(
+                data.customerEmail(),
+                "Tu cotización está lista #" + data.orderId(),
+                buildEmailTemplate("Pedido listo para pagar", content)
+        );
     }
 
     // -------------------------------------------------------------------------

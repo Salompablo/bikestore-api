@@ -7,12 +7,20 @@ import com.bikestore.api.dto.response.PaymentInfo;
 import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.User;
 import com.bikestore.api.entity.WebhookEvent;
+import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.entity.enums.WebhookEventStatus;
+import com.bikestore.api.event.ShippingQuotePublishedData;
+import com.bikestore.api.event.ShippingQuotePublishedEvent;
 import com.bikestore.api.repository.WebhookEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -23,29 +31,53 @@ public class CheckoutFacade {
     private final PaymentGatewayService paymentGatewayService;
     private final OrderService orderService;
     private final UserService userService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final List<CheckoutInitializationStrategy> checkoutStrategies;
 
     public CheckoutResponse initializeCheckout(CheckoutRequest request, User authenticatedUser) {
-        Order order = orderService.createPendingOrder(request, authenticatedUser);
-
         if (request.savePhoneToProfile()) {
             userService.updateDefaultPhone(authenticatedUser, request.contactPhone());
         }
 
-        try {
-            CheckoutInfo checkoutInfo = paymentGatewayService.createPreference(order);
-            orderService.updateOrderPreference(order.getId(), checkoutInfo.preferenceId());
-            log.info("Checkout initialized for Order {}. MP Preference: {}", order.getId(), checkoutInfo.preferenceId());
-            return new CheckoutResponse(order.getId(), checkoutInfo.preferenceId(), checkoutInfo.initPoint());
-        } catch (Exception e) {
-            log.error("Failed to create MP preference for Order {}. Releasing reservation.", order.getId(), e);
-            try {
-                orderService.cancelOrder(order.getId(), authenticatedUser);
-            } catch (Exception compensationError) {
-                log.error("Compensation cancelOrder also failed for Order {}. Manual intervention needed.",
-                        order.getId(), compensationError);
-            }
-            throw new RuntimeException("Payment initialization failed. Please retry.", e);
+        Map<DeliveryMethod, CheckoutInitializationStrategy> strategiesByMethod = new EnumMap<>(DeliveryMethod.class);
+        for (CheckoutInitializationStrategy strategy : checkoutStrategies) {
+            strategiesByMethod.put(strategy.supportedMethod(), strategy);
         }
+
+        CheckoutInitializationStrategy selected = strategiesByMethod.get(request.deliveryMethod());
+        if (selected == null) {
+            throw new IllegalArgumentException("Unsupported delivery method: " + request.deliveryMethod());
+        }
+        return selected.initialize(request, authenticatedUser);
+    }
+
+    public CheckoutResponse publishShippingQuote(Long orderId, BigDecimal shippingCost) {
+        Order order = orderService.prepareShippingQuote(orderId, shippingCost);
+
+        if (order.getPreferenceId() != null && !order.getPreferenceId().isBlank()) {
+            return new CheckoutResponse(order.getId(), order.getPreferenceId(), null, false, true, "CHECKOUT_READY");
+        }
+
+        CheckoutInfo checkoutInfo = paymentGatewayService.createPreference(order);
+        orderService.updateOrderPreference(order.getId(), checkoutInfo.preferenceId());
+
+        String firstName = order.getUser().getFirstName() == null ? "" : order.getUser().getFirstName().trim();
+        String lastName = order.getUser().getLastName() == null ? "" : order.getUser().getLastName().trim();
+        String fullName = (firstName + " " + lastName).trim();
+        if (fullName.isBlank()) {
+            fullName = "Cliente";
+        }
+
+        eventPublisher.publishEvent(new ShippingQuotePublishedEvent(this, new ShippingQuotePublishedData(
+                order.getId(),
+                fullName,
+                order.getUser().getEmail(),
+                order.getTotalAmount(),
+                order.getShippingCost(),
+                checkoutInfo.initPoint()
+        )));
+
+        return new CheckoutResponse(order.getId(), checkoutInfo.preferenceId(), checkoutInfo.initPoint(), false, true, "CHECKOUT_READY");
     }
 
     public void processWebHook(Long paymentId, String eventId) {

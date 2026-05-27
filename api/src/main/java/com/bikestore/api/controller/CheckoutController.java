@@ -34,16 +34,12 @@ public class CheckoutController {
 
     @Operation(
             summary = "Initialize checkout",
-            description = "Creates a PENDING order, securely reserves product stock, and generates a Mercado Pago payment preference. Requires CUSTOMER privileges."
+            description = "Creates an order and reserves stock. STORE_PICKUP generates Mercado Pago preference immediately; SHIPPING leaves the order pending manual quote."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Checkout successfully initialized",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = CheckoutResponse.class), examples = @ExampleObject(value = """
-                            {
-                                "orderId": 15,
-                                "preferenceId": "3226905474-059535ac-abe2-4a30-97be-46cf815c92b6",
-                                "initPoint": "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=3226905474-059535ac-abe2-4a30-97be-46cf815c92b6"
-                            }
+                            {"orderId":15,"preferenceId":"3226905474-059535ac-abe2-4a30-97be-46cf815c92b6","initPoint":"https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=3226905474-059535ac-abe2-4a30-97be-46cf815c92b6","requiresShippingQuote":false,"payableNow":true,"flowStatus":"CHECKOUT_READY"}
                             """))),
             @ApiResponse(responseCode = "404", description = "Not Found - User or Product does not exist",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class))),

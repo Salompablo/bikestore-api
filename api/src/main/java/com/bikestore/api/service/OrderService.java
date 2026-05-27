@@ -8,6 +8,8 @@ import com.bikestore.api.entity.enums.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
+
 public interface OrderService {
     Page<OrderResponse> getMyOrders(User authenticatedUser, Pageable pageable);
     OrderResponse getMyOrderById(Long id, User authenticatedUser);
@@ -15,6 +17,7 @@ public interface OrderService {
     OrderResponse updateOrderStatus(Long id, OrderStatus newStatus);
     Order createPendingOrder(CheckoutRequest checkoutRequest, User authenticatedUser);
     void updateOrderPreference(Long orderId, String preferenceId);
+    Order prepareShippingQuote(Long orderId, BigDecimal shippingCost);
     void confirmOrder(Long orderId);
     void markOrderAsPending(Long orderId);
     void cancelOrder(Long orderId, User authenticatedUser);

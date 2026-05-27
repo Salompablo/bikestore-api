@@ -3,6 +3,7 @@ package com.bikestore.api.service;
 import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.StockReservation;
 import com.bikestore.api.entity.enums.OrderStatus;
+import com.bikestore.api.entity.enums.PaymentStatus;
 import com.bikestore.api.entity.enums.ReservationStatus;
 import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.repository.OrderRepository;
@@ -86,8 +87,14 @@ public class OrderCleanupService {
         Long orderId = reservation.getOrder().getId();
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found: " + orderId));
-        if (order.getStatus() == OrderStatus.INITIATED || order.getStatus() == OrderStatus.PENDING) {
+        if (order.getStatus() == OrderStatus.INITIATED
+                || order.getStatus() == OrderStatus.PENDING
+                || order.getStatus() == OrderStatus.QUOTE_REQUESTED
+                || order.getStatus() == OrderStatus.QUOTE_READY_PAYMENT_PENDING) {
             order.setStatus(OrderStatus.CANCELLED);
+            if (order.getPaymentStatus() != PaymentStatus.APPROVED) {
+                order.setPaymentStatus(PaymentStatus.CANCELLED);
+            }
             orderRepository.save(order);
             log.info("Order {} cancelled due to expired reservation {}.", orderId, reservationId);
         }
