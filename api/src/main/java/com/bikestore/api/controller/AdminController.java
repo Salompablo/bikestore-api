@@ -2,6 +2,7 @@ package com.bikestore.api.controller;
 
 import com.bikestore.api.annotation.ApiAdminErrors;
 import com.bikestore.api.annotation.ApiNotFound;
+import com.bikestore.api.dto.response.AdminOrderDetailResponse;
 import com.bikestore.api.dto.request.ShippingQuoteApprovalRequest;
 import com.bikestore.api.dto.request.ShippingZoneRequest;
 import com.bikestore.api.dto.response.CheckoutResponse;
@@ -89,6 +90,16 @@ public class AdminController {
 
         Page<OrderResponse> springPage = orderService.getAllOrders(pageable);
         return ResponseEntity.ok(PageResponse.of(springPage));
+    }
+
+    @Operation(summary = "Get order detail", description = "Retrieves a single order with full detail for admin workflows such as shipping quotation.")
+    @ApiResponse(responseCode = "200", description = "Order successfully retrieved")
+    @ApiNotFound
+    @ApiAdminErrors
+    @GetMapping("/orders/{id}")
+    public ResponseEntity<AdminOrderDetailResponse> getOrderById(
+            @Parameter(description = "Order ID", example = "1001") @PathVariable Long id) {
+        return ResponseEntity.ok(orderService.getOrderByIdForAdmin(id));
     }
 
     @Operation(summary = "Update order status", description = "Changes the status of a specific order (e.g., PENDING to SHIPPED).")
