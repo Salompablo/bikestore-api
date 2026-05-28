@@ -41,9 +41,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -71,6 +73,10 @@ public class OrderServiceImpl implements OrderService {
             OrderStatus.QUOTE_READY_PAYMENT_PENDING
     );
     private static final Set<OrderStatus> HIDDEN_FROM_USER = EnumSet.of(OrderStatus.INITIATED);
+    private static final int SHIPPING_ADDRESS_MIN_LENGTH = 5;
+    private static final int SHIPPING_ADDRESS_MAX_LENGTH = 200;
+    private static final Pattern SHIPPING_ADDRESS_PATTERN = Pattern.compile("^[\\p{L}\\p{N}\\s.,#°'()/-]+$");
+    private static final Pattern ZIP_CODE_PATTERN = Pattern.compile("^(?:\\d{4}|[A-Z]\\d{4}[A-Z]{3})$");
 
     @Override
     @Transactional(readOnly = true)
@@ -129,14 +135,12 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public Order createPendingOrder(CheckoutRequest checkoutRequest, User authenticatedUser) {
         DeliveryMethod deliveryMethod = checkoutRequest.deliveryMethod();
+        String normalizedShippingAddress = null;
+        String normalizedZipCode = null;
 
         if (deliveryMethod == DeliveryMethod.SHIPPING) {
-            if (checkoutRequest.shippingAddress() == null || checkoutRequest.shippingAddress().isBlank()) {
-                throw new IllegalArgumentException("Shipping address is required for delivery orders");
-            }
-            if (checkoutRequest.zipCode() == null || checkoutRequest.zipCode().isBlank()) {
-                throw new IllegalArgumentException("ZIP code is required for delivery orders");
-            }
+            normalizedShippingAddress = normalizeShippingAddress(checkoutRequest.shippingAddress());
+            normalizedZipCode = normalizeZipCode(checkoutRequest.zipCode());
         }
 
         // Cancel any pre-existing active order for this user before creating a new one
@@ -201,8 +205,8 @@ public class OrderServiceImpl implements OrderService {
 
         if (deliveryMethod == DeliveryMethod.SHIPPING) {
             order.setShippingCost(BigDecimal.ZERO);
-            order.setShippingAddress(checkoutRequest.shippingAddress());
-            order.setZipCode(checkoutRequest.zipCode());
+            order.setShippingAddress(normalizedShippingAddress);
+            order.setZipCode(normalizedZipCode);
         } else {
             order.setShippingCost(BigDecimal.ZERO);
             order.setShippingAddress(null);
@@ -413,6 +417,31 @@ public class OrderServiceImpl implements OrderService {
 
     private void validateStatusTransition(Order order, OrderStatus newStatus) {
         transitionPolicy.validateTransition(order, newStatus);
+    }
+
+    private String normalizeShippingAddress(String shippingAddress) {
+        if (shippingAddress == null || shippingAddress.isBlank()) {
+            throw new IllegalArgumentException("Shipping address is required for delivery orders");
+        }
+        String normalizedAddress = shippingAddress.trim().replaceAll("\\s+", " ");
+        if (normalizedAddress.length() < SHIPPING_ADDRESS_MIN_LENGTH || normalizedAddress.length() > SHIPPING_ADDRESS_MAX_LENGTH) {
+            throw new IllegalArgumentException("Shipping address must be between 5 and 200 characters");
+        }
+        if (!SHIPPING_ADDRESS_PATTERN.matcher(normalizedAddress).matches()) {
+            throw new IllegalArgumentException("Shipping address contains invalid characters");
+        }
+        return normalizedAddress;
+    }
+
+    private String normalizeZipCode(String zipCode) {
+        if (zipCode == null || zipCode.isBlank()) {
+            throw new IllegalArgumentException("ZIP code is required for delivery orders");
+        }
+        String normalizedZipCode = zipCode.trim().toUpperCase(Locale.ROOT);
+        if (!ZIP_CODE_PATTERN.matcher(normalizedZipCode).matches()) {
+            throw new IllegalArgumentException("ZIP code must be 4 digits or CPA format (A9999AAA)");
+        }
+        return normalizedZipCode;
     }
 
     private ShippingQuoteRequestedData buildShippingQuoteRequestedData(Order order) {
