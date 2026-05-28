@@ -5,6 +5,7 @@ import com.bikestore.api.dto.response.CheckoutInfo;
 import com.bikestore.api.dto.response.CheckoutResponse;
 import com.bikestore.api.dto.response.PaymentInfo;
 import com.bikestore.api.entity.Order;
+import com.bikestore.api.entity.OrderItem;
 import com.bikestore.api.entity.User;
 import com.bikestore.api.entity.WebhookEvent;
 import com.bikestore.api.entity.enums.DeliveryMethod;
@@ -74,6 +75,8 @@ public class CheckoutFacade {
                 order.getId(),
                 fullName,
                 order.getUser().getEmail(),
+                calculateProductsSubtotal(order.getItems()),
+                buildShippingQuoteItems(order.getItems()),
                 order.getTotalAmount(),
                 order.getShippingCost()
         )));
@@ -131,6 +134,26 @@ public class CheckoutFacade {
             log.error("Error processing Mercado Pago Webhook for payment: " + paymentId, e);
             event.setStatus(WebhookEventStatus.FAILED);
             webhookEventRepository.save(event);
+        }
+
+        private List<ShippingQuotePublishedData.ShippingQuoteItemData> buildShippingQuoteItems(List<OrderItem> orderItems) {
+            return orderItems.stream()
+                    .map(item -> {
+                        BigDecimal lineTotal = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+                        return new ShippingQuotePublishedData.ShippingQuoteItemData(
+                                item.getProduct().getName(),
+                                item.getQuantity(),
+                                item.getUnitPrice(),
+                                lineTotal
+                        );
+                    })
+                    .toList();
+        }
+
+        private BigDecimal calculateProductsSubtotal(List<OrderItem> orderItems) {
+            return orderItems.stream()
+                    .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
         }
     }
 

@@ -17,6 +17,8 @@ import com.bikestore.api.entity.enums.ReservationStatus;
 import com.bikestore.api.event.AdminOrderNotificationEvent;
 import com.bikestore.api.event.CustomerOrderConfirmationEvent;
 import com.bikestore.api.event.OrderPaidNotificationData;
+import com.bikestore.api.event.ShippingQuoteRequestedData;
+import com.bikestore.api.event.ShippingQuoteRequestedEvent;
 import com.bikestore.api.exception.ConflictException;
 import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.mapper.OrderMapper;
@@ -223,6 +225,18 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public Order createPendingShippingOrderAndNotify(CheckoutRequest checkoutRequest, User authenticatedUser) {
+        Order order = createPendingOrder(checkoutRequest, authenticatedUser);
+        if (order.getDeliveryMethod() != DeliveryMethod.SHIPPING) {
+            return order;
+        }
+
+        eventPublisher.publishEvent(new ShippingQuoteRequestedEvent(this, buildShippingQuoteRequestedData(order)));
+        return order;
+    }
+
+    @Override
+    @Transactional
     public void updateOrderPreference(Long orderId, String preferenceId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
@@ -399,6 +413,42 @@ public class OrderServiceImpl implements OrderService {
 
     private void validateStatusTransition(Order order, OrderStatus newStatus) {
         transitionPolicy.validateTransition(order, newStatus);
+    }
+
+    private ShippingQuoteRequestedData buildShippingQuoteRequestedData(Order order) {
+        String firstName = order.getUser().getFirstName() == null ? "" : order.getUser().getFirstName().trim();
+        String lastName = order.getUser().getLastName() == null ? "" : order.getUser().getLastName().trim();
+        String fullName = (firstName + " " + lastName).trim();
+        if (fullName.isBlank()) {
+            fullName = "Cliente sin nombre";
+        }
+
+        List<ShippingQuoteRequestedData.ShippingQuoteItemData> items = order.getItems().stream()
+                .map(item -> {
+                    BigDecimal lineTotal = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+                    return new ShippingQuoteRequestedData.ShippingQuoteItemData(
+                            item.getProduct().getName(),
+                            item.getQuantity(),
+                            item.getUnitPrice(),
+                            lineTotal
+                    );
+                })
+                .toList();
+
+        BigDecimal productsSubtotal = items.stream()
+                .map(ShippingQuoteRequestedData.ShippingQuoteItemData::lineTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new ShippingQuoteRequestedData(
+                order.getId(),
+                fullName,
+                order.getUser().getEmail(),
+                order.getContactPhone(),
+                order.getShippingAddress(),
+                order.getZipCode(),
+                productsSubtotal,
+                items
+        );
     }
 
     private OrderPaidNotificationData buildOrderPaidNotificationData(Order order) {
