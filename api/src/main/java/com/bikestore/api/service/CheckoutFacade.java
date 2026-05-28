@@ -135,26 +135,25 @@ public class CheckoutFacade {
             event.setStatus(WebhookEventStatus.FAILED);
             webhookEventRepository.save(event);
         }
-
-        private List<ShippingQuotePublishedData.ShippingQuoteItemData> buildShippingQuoteItems(List<OrderItem> orderItems) {
-            return orderItems.stream()
-                    .map(item -> {
-                        BigDecimal lineTotal = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
-                        return new ShippingQuotePublishedData.ShippingQuoteItemData(
-                                item.getProduct().getName(),
-                                item.getQuantity(),
-                                item.getUnitPrice(),
-                                lineTotal
-                        );
-                    })
-                    .toList();
-        }
-
-        private BigDecimal calculateProductsSubtotal(List<OrderItem> orderItems) {
-            return orderItems.stream()
-                    .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-        }
     }
 
+    private List<ShippingQuotePublishedData.ShippingQuoteItemData> buildShippingQuoteItems(List<OrderItem> orderItems) {
+        return orderItems.stream()
+                .map(item -> {
+                    BigDecimal lineTotal = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+                    return new ShippingQuotePublishedData.ShippingQuoteItemData(
+                            item.getProduct().getName(),
+                            item.getQuantity(),
+                            item.getUnitPrice(),
+                            lineTotal
+                    );
+                })
+                .toList();
+    }
+
+    private BigDecimal calculateProductsSubtotal(List<OrderItem> orderItems) {
+        return orderItems.stream()
+                .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
 }
