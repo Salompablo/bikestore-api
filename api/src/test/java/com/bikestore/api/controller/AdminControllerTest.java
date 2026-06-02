@@ -71,7 +71,8 @@ class AdminControllerTest {
                     null,
                     null,
                     true,
-                    false
+                    false,
+                    null
             );
 
             when(orderService.getOrderByIdForAdmin(77L)).thenReturn(detail);

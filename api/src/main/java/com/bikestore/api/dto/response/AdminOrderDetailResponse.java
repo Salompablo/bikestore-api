@@ -66,6 +66,9 @@ public record AdminOrderDetailResponse(
         boolean requiresShippingQuote,
 
         @Schema(description = "True when customer can proceed with payment", example = "false")
-        boolean payableNow
+        boolean payableNow,
+
+        @Schema(description = "Deadline by which the customer must pay after the shipping quote is sent. Null until the quote is published.", example = "2026-06-02T18:00:00")
+        LocalDateTime quoteExpiresAt
 ) {
 }

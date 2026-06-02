@@ -68,6 +68,9 @@ public class Order {
     @Column(name = "contact_phone")
     private String contactPhone;
 
+    @Column(name = "quote_expires_at")
+    private LocalDateTime quoteExpiresAt;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();

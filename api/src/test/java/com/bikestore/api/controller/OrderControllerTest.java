@@ -40,7 +40,7 @@ class OrderControllerTest {
     private static final User DUMMY_USER = User.builder().build();
     private static final OrderResponse DUMMY_ORDER = new OrderResponse(
             1L, "PAID", "SHIPPING", null, null, null, List.of(), null, null, null, null, null,
-            "APPROVED", "pref-1", "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref-1", false, true);
+            "APPROVED", "pref-1", "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref-1", false, true, null);
 
     // ── getMyOrders ───────────────────────────────────────────────────────────
 

@@ -66,6 +66,9 @@ public class OrderServiceImpl implements OrderService {
     @Value("${app.orders.reservation-ttl.shipping-quote-hours:24}")
     private int shippingQuoteReservationTtlHours;
 
+    @Value("${app.orders.reservation-ttl.quote-ready-hours:2}")
+    private int quoteReadyTtlHours;
+
     private static final Set<OrderStatus> CANCELLABLE_STATUSES = EnumSet.of(
             OrderStatus.INITIATED,
             OrderStatus.PENDING,
@@ -278,6 +281,7 @@ public class OrderServiceImpl implements OrderService {
                 && normalizedShippingCost.compareTo(currentShippingCost) == 0
                 && order.getPreferenceId() != null
                 && !order.getPreferenceId().isBlank()) {
+            resetQuotePaymentWindow(order);
             return order;
         }
 
@@ -294,6 +298,7 @@ public class OrderServiceImpl implements OrderService {
             order.setPreferenceId(null);
         }
 
+        resetQuotePaymentWindow(order);
         return orderRepository.save(order);
     }
 
@@ -417,6 +422,26 @@ public class OrderServiceImpl implements OrderService {
 
     private void validateStatusTransition(Order order, OrderStatus newStatus) {
         transitionPolicy.validateTransition(order, newStatus);
+    }
+
+    /**
+     * Resets the payment window for a quote-ready order to {@code quoteReadyTtlHours} from now.
+     * Updates both the order's {@code quoteExpiresAt} and the {@code expiresAt} of all its ACTIVE
+     * stock reservations, so the cleanup scheduler cancels the order if the customer does not pay
+     * within that window.
+     */
+    private void resetQuotePaymentWindow(Order order) {
+        LocalDateTime newExpiry = LocalDateTime.now().plusHours(quoteReadyTtlHours);
+        order.setQuoteExpiresAt(newExpiry);
+        orderRepository.save(order);
+
+        List<StockReservation> activeReservations =
+                stockReservationRepository.findByOrderIdAndStatus(order.getId(), ReservationStatus.ACTIVE);
+        for (StockReservation reservation : activeReservations) {
+            reservation.setExpiresAt(newExpiry);
+            stockReservationRepository.save(reservation);
+        }
+        log.info("Quote payment window reset for order {}. Expires at {}.", order.getId(), newExpiry);
     }
 
     private String normalizeShippingAddress(String shippingAddress) {
