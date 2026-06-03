@@ -427,4 +427,28 @@ class StockReservationIntegrationTest {
         assertEquals(0, afterWebhook.getReservedStock(),
                 "reservedStock must be 0 after the reservation is consumed");
     }
+
+    @Test
+    @DisplayName("Webhook status progression: same payment pending -> approved must end in PAID")
+    void testWebhookPendingThenApprovedProgressesToPaid() {
+        Product product = createProduct(4);
+        Order order = orderService.createPendingOrder(checkoutFor(product.getId(), 1), testUser);
+        long paymentId = 161524658773L;
+        String eventId = "EVENT-PROGRESSION-" + UUID.randomUUID();
+
+        when(paymentGatewayService.getPaymentInfo(paymentId))
+                .thenReturn(new PaymentInfo("pending", order.getId().toString()))
+                .thenReturn(new PaymentInfo("approved", order.getId().toString()));
+
+        assertDoesNotThrow(() -> checkoutFacade.processWebHook(paymentId, eventId));
+        assertDoesNotThrow(() -> checkoutFacade.processWebHook(paymentId, eventId));
+
+        Order updatedOrder = orderRepository.findById(order.getId()).orElseThrow();
+        assertEquals(OrderStatus.PAID, updatedOrder.getStatus(),
+                "Order must transition to PAID after approved webhook");
+
+        List<WebhookEvent> events = webhookEventRepository.findAll();
+        assertEquals(2, events.size(),
+                "Pending and approved statuses must be processed once each");
+    }
 }
