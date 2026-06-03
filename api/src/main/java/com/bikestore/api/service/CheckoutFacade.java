@@ -12,9 +12,11 @@ import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.entity.enums.WebhookEventStatus;
 import com.bikestore.api.event.ShippingQuotePublishedData;
 import com.bikestore.api.event.ShippingQuotePublishedEvent;
+import com.bikestore.api.repository.OrderRepository;
 import com.bikestore.api.repository.WebhookEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +32,7 @@ import java.util.Map;
 public class CheckoutFacade {
 
     private final WebhookEventRepository webhookEventRepository;
+    private final OrderRepository orderRepository;
     private final PaymentGatewayService paymentGatewayService;
     private final OrderService orderService;
     private final UserService userService;
@@ -85,56 +88,128 @@ public class CheckoutFacade {
     }
 
     public void processWebHook(Long paymentId, String eventId) {
-        if (webhookEventRepository.existsByEventId(eventId)) {
-            log.info("Duplicate webhook event '{}' for payment {}. Skipping.", eventId, paymentId);
-            return;
-        }
+        processWebHook(paymentId, eventId, null, null);
+    }
 
-        WebhookEvent event = webhookEventRepository.save(WebhookEvent.builder()
-                .eventId(eventId)
-                .status(WebhookEventStatus.RECEIVED)
-                .payload(paymentId.toString())
-                .build());
+    public void processWebHook(Long paymentId, String eventId, String topic, String type) {
+        WebhookEvent event = null;
+        String responseAction = "noop";
+        String rejectionReason = null;
+        String mpStatus = null;
+        String externalReference = null;
+        String orderStatusBefore = null;
+        String transitionApplied = "none";
+        Long orderId = null;
 
         try {
             PaymentInfo paymentInfo = paymentGatewayService.getPaymentInfo(paymentId);
-            log.info("Payment details received for ID {}. Status: {}", paymentId, paymentInfo.status());
+            mpStatus = normalize(paymentInfo.status());
+            externalReference = normalize(paymentInfo.externalReference());
+            String processingEventId = buildProcessingEventId(paymentId, mpStatus);
 
-            if ("approved".equals(paymentInfo.status())) {
-                String orderIdStr = paymentInfo.externalReference();
+            if (webhookEventRepository.existsByEventId(processingEventId)) {
+                responseAction = "duplicate_ignored";
+                log.info(
+                        "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} response_status={}",
+                        paymentId, topic, type, eventId, mpStatus, externalReference, responseAction, 200
+                );
+                return;
+            }
 
-                if (orderIdStr == null || orderIdStr.isEmpty()) {
-                    log.warn("Payment {} approved but has no external reference (Order ID). Skipping.", paymentId);
-                    event.setStatus(WebhookEventStatus.FAILED);
-                    webhookEventRepository.save(event);
-                    return;
-                }
+            try {
+                event = webhookEventRepository.save(WebhookEvent.builder()
+                        .eventId(processingEventId)
+                        .status(WebhookEventStatus.RECEIVED)
+                        .payload(String.format(
+                                "{\"paymentId\":%d,\"incomingEventId\":\"%s\",\"topic\":\"%s\",\"type\":\"%s\",\"mpStatus\":\"%s\",\"externalReference\":\"%s\"}",
+                                paymentId, safeForPayload(eventId), safeForPayload(topic), safeForPayload(type), safeForPayload(mpStatus), safeForPayload(externalReference)
+                        ))
+                        .build());
+            } catch (DataIntegrityViolationException duplicateEventException) {
+                responseAction = "duplicate_ignored";
+                log.info(
+                        "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} response_status={}",
+                        paymentId, topic, type, eventId, mpStatus, externalReference, responseAction, 200
+                );
+                return;
+            }
 
-                Long orderId = Long.parseLong(orderIdStr);
+            if (externalReference == null) {
+                rejectionReason = "missing_external_reference";
+                responseAction = "failed";
+                log.warn(
+                        "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} rejection_reason={} response_status={}",
+                        paymentId, topic, type, eventId, mpStatus, externalReference, responseAction, rejectionReason, 200
+                );
+                event.setStatus(WebhookEventStatus.FAILED);
+                webhookEventRepository.save(event);
+                return;
+            }
+
+            try {
+                orderId = Long.parseLong(externalReference);
+            } catch (NumberFormatException e) {
+                rejectionReason = "invalid_external_reference";
+                responseAction = "failed";
+                log.warn(
+                        "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} rejection_reason={} response_status={}",
+                        paymentId, topic, type, eventId, mpStatus, externalReference, responseAction, rejectionReason, 200
+                );
+                event.setStatus(WebhookEventStatus.FAILED);
+                webhookEventRepository.save(event);
+                return;
+            }
+
+            Order order = orderRepository.findById(orderId).orElse(null);
+            orderStatusBefore = order == null || order.getStatus() == null ? null : order.getStatus().name();
+
+            if ("approved".equals(mpStatus)) {
                 orderService.confirmOrder(orderId);
-
-            } else if ("pending".equals(paymentInfo.status())) {
-                String orderIdStr = paymentInfo.externalReference();
-
-                if (orderIdStr == null || orderIdStr.isEmpty()) {
-                    log.warn("Payment {} pending but has no external reference (Order ID). Skipping.", paymentId);
-                    event.setStatus(WebhookEventStatus.FAILED);
-                    webhookEventRepository.save(event);
-                    return;
-                }
-
-                Long orderId = Long.parseLong(orderIdStr);
+                transitionApplied = "to_paid";
+            } else if ("pending".equals(mpStatus)) {
                 orderService.markOrderAsPending(orderId);
+                transitionApplied = "to_pending";
+            } else {
+                transitionApplied = "unsupported_mp_status";
             }
 
             event.setStatus(WebhookEventStatus.PROCESSED);
             webhookEventRepository.save(event);
+            responseAction = "processed";
+            log.info(
+                    "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} order_id={} order_found={} order_status_before={} transition_applied={} action={} response_status={}",
+                    paymentId, topic, type, eventId, mpStatus, externalReference, orderId, order != null, orderStatusBefore, transitionApplied, responseAction, 200
+            );
 
         } catch (Exception e) {
-            log.error("Error processing Mercado Pago Webhook for payment: " + paymentId, e);
-            event.setStatus(WebhookEventStatus.FAILED);
-            webhookEventRepository.save(event);
+            log.error(
+                    "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} order_id={} order_status_before={} transition_applied={} action={} rejection_reason={} response_status={}",
+                    paymentId, topic, type, eventId, mpStatus, externalReference, orderId, orderStatusBefore, transitionApplied, "failed", "exception", 500, e
+            );
+            if (event != null) {
+                event.setStatus(WebhookEventStatus.FAILED);
+                webhookEventRepository.save(event);
+            }
         }
+    }
+
+    private String buildProcessingEventId(Long paymentId, String status) {
+        return "payment-" + paymentId + "-status-" + (status == null ? "unknown" : status);
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized.toLowerCase();
+    }
+
+    private String safeForPayload(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\"", "\\\"");
     }
 
     private List<ShippingQuotePublishedData.ShippingQuoteItemData> buildShippingQuoteItems(List<OrderItem> orderItems) {

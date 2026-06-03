@@ -66,44 +66,57 @@ public class WebhookController {
 
         try {
             String actualId = dataIdUrl != null ? dataIdUrl : ipnId;
+            String webhookKind = xSignature != null || xRequestId != null ? "signed_webhook" : "ipn";
 
             if (actualId == null) {
-                log.info("Received empty test payload or malformed request from MP. Returning 200 OK.");
+                log.info("webhook_received kind={} payment_id={} topic={} type={} action={} response_status={}",
+                        webhookKind, null, topic, type, "ignored_empty_payload", 200);
                 return ResponseEntity.ok("Test OK");
             }
 
             if ("merchant_order".equals(topic)) {
+                log.info("webhook_received kind={} payment_id={} topic={} type={} action={} response_status={}",
+                        webhookKind, actualId, topic, type, "ignored_merchant_order", 200);
                 return ResponseEntity.ok("Ignored merchant_order");
             }
 
             if (xSignature != null && xRequestId != null) {
                 // V1 Webhook: cryptographic HMAC-SHA256 signature validation
                 if (!signatureValidator.isValid(xSignature, xRequestId, actualId)) {
-                    log.warn("MP Signature mismatch for ID: {}. Rejecting webhook.", actualId);
+                    log.warn("webhook_rejected kind=signed_webhook payment_id={} topic={} type={} reason={} response_status={}",
+                            actualId, topic, type, "invalid_signature", 403);
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Invalid signature");
                 }
-                log.info("Processing signed Webhook. Payment ID: {}", actualId);
+                log.info("webhook_received kind=signed_webhook payment_id={} topic={} type={} action={} response_status={}",
+                        actualId, topic, type, "accepted", 200);
                 if ("payment".equals(type) || "payment".equals(topic)) {
-                    checkoutFacade.processWebHook(Long.valueOf(actualId), xRequestId);
+                    checkoutFacade.processWebHook(Long.valueOf(actualId), xRequestId, topic, type);
                 }
+            } else if (xSignature != null || xRequestId != null) {
+                log.warn("webhook_rejected kind=signed_webhook payment_id={} topic={} type={} reason={} response_status={}",
+                        actualId, topic, type, "missing_signature_headers", 403);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Missing signature headers");
             } else {
                 // V2 IPN: no signature — validate by IP allowlist then rate limit
                 String clientIp = resolveClientIp(request);
 
                 if (!ipValidator.isAllowed(clientIp)) {
-                    log.warn("IPN rejected: unauthorized origin IP '{}'.", clientIp);
+                    log.warn("webhook_rejected kind=ipn payment_id={} topic={} type={} origin_ip={} reason={} response_status={}",
+                            actualId, topic, type, clientIp, "unauthorized_origin", 403);
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unauthorized origin");
                 }
 
                 if (!rateLimiter.isAllowed(clientIp)) {
-                    log.warn("IPN rejected: rate limit exceeded for IP '{}'.", clientIp);
+                    log.warn("webhook_rejected kind=ipn payment_id={} topic={} type={} origin_ip={} reason={} response_status={}",
+                            actualId, topic, type, clientIp, "rate_limit_exceeded", 429);
                     return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("Rate limit exceeded");
                 }
 
-                log.info("Processing IPN. Payment ID: {}, origin IP: {}", actualId, clientIp);
+                log.info("webhook_received kind=ipn payment_id={} topic={} type={} origin_ip={} action={} response_status={}",
+                        actualId, topic, type, clientIp, "accepted", 200);
                 if ("payment".equals(topic)) {
-                    // Use a stable synthetic event ID so duplicate IPN retries from MP are deduplicated
-                    checkoutFacade.processWebHook(Long.valueOf(actualId), IPN_EVENT_ID_PREFIX + actualId);
+                    // Forward a traceable synthetic event ID; idempotency is resolved in CheckoutFacade by payment status.
+                    checkoutFacade.processWebHook(Long.valueOf(actualId), IPN_EVENT_ID_PREFIX + actualId, topic, type);
                 }
             }
 
