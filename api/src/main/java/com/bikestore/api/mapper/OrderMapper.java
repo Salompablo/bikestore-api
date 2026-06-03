@@ -39,7 +39,8 @@ public class OrderMapper {
                 order.getPreferenceId(),
                 buildCheckoutUrl(order.getPreferenceId()),
                 requiresShippingQuote(order),
-                isPayableNow(order)
+                isPayableNow(order),
+                order.getQuoteExpiresAt()
         );
     }
 
@@ -68,7 +69,8 @@ public class OrderMapper {
                 order.getPreferenceId(),
                 buildCheckoutUrl(order.getPreferenceId()),
                 requiresShippingQuote(order),
-                isPayableNow(order)
+                isPayableNow(order),
+                order.getQuoteExpiresAt()
         );
     }
 

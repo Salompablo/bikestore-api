@@ -18,6 +18,7 @@ public interface OrderService {
     AdminOrderDetailResponse getOrderByIdForAdmin(Long id);
     OrderResponse updateOrderStatus(Long id, OrderStatus newStatus);
     Order createPendingOrder(CheckoutRequest checkoutRequest, User authenticatedUser);
+    Order createPendingShippingOrderAndNotify(CheckoutRequest checkoutRequest, User authenticatedUser);
     void updateOrderPreference(Long orderId, String preferenceId);
     Order prepareShippingQuote(Long orderId, BigDecimal shippingCost);
     void confirmOrder(Long orderId);

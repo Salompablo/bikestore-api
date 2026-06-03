@@ -225,6 +225,7 @@ public class EmailService {
         String shippingAddress = safeText(data.shippingAddress(), "No informado");
         String zipCode = safeText(data.zipCode(), "No informado");
         String adminOrderUrl = buildFrontendUrl("/admin/orders/" + data.orderId());
+        String quoteItemRows = buildShippingQuoteRequestItemRows(data.items());
 
         String content = String.format(
                 "<p style=\"margin:0 0 16px 0;font-size:16px;color:#374151;\">Hay una orden esperando cotización de envío.</p>" +
@@ -236,6 +237,24 @@ public class EmailService {
                         "<tr><td style=\"padding:8px 0;color:#6b7280;\">Dirección</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
                         "<tr><td style=\"padding:8px 0;color:#6b7280;\">Código postal</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
                         "</table>" +
+                        "<p style=\"margin:0 0 8px 0;font-size:15px;color:#374151;font-weight:bold;\">Productos solicitados</p>" +
+                        "<table style=\"width:100%%;border-collapse:collapse;margin-bottom:24px;font-size:15px;\">" +
+                        "<thead>" +
+                        "<tr style=\"background-color:#f3f4f6;\">" +
+                        "<th style=\"padding:10px 8px;text-align:left;color:#374151;border-bottom:2px solid #e5e7eb;\">Producto</th>" +
+                        "<th style=\"padding:10px 8px;text-align:center;color:#374151;border-bottom:2px solid #e5e7eb;\">Cantidad</th>" +
+                        "<th style=\"padding:10px 8px;text-align:right;color:#374151;border-bottom:2px solid #e5e7eb;\">Precio unitario</th>" +
+                        "<th style=\"padding:10px 8px;text-align:right;color:#374151;border-bottom:2px solid #e5e7eb;\">Subtotal</th>" +
+                        "</tr>" +
+                        "</thead>" +
+                        "<tbody>%s</tbody>" +
+                        "</table>" +
+                        "<table style=\"width:100%%;border-collapse:collapse;margin-bottom:24px;font-size:15px;\">" +
+                        "<tr style=\"background-color:#fef9c3;\">" +
+                        "<td style=\"padding:12px 8px;font-weight:bold;color:#111827;\">Total productos</td>" +
+                        "<td style=\"padding:12px 8px;font-weight:bold;color:#111827;text-align:right;\">%s</td>" +
+                        "</tr>" +
+                        "</table>" +
                         "<div style=\"text-align:center;margin:0 0 24px 0;\">" +
                         "<a href=\"%s\" style=\"display:inline-block;background-color:#1f2937;color:#ffffff;font-size:16px;" +
                         "font-weight:700;text-decoration:none;padding:14px 28px;border-radius:999px;\">Cotizar pedido</a>" +
@@ -246,6 +265,8 @@ public class EmailService {
                 HtmlUtils.htmlEscape(contactPhone),
                 HtmlUtils.htmlEscape(shippingAddress),
                 HtmlUtils.htmlEscape(zipCode),
+                quoteItemRows,
+                formatCurrency(data.productsSubtotal()),
                 adminOrderUrl
         );
 
@@ -259,13 +280,27 @@ public class EmailService {
     public void sendCustomerShippingQuoteReady(ShippingQuotePublishedData data) {
         String customerName = safeText(data.customerName(), "Cliente");
         String orderDetailUrl = buildFrontendUrl("/orders/" + data.orderId());
+        String quoteItemRows = buildShippingQuotePublishedItemRows(data.items());
 
         String content = String.format(
                 "<p style=\"margin:0 0 16px 0;font-size:16px;color:#374151;\">¡Hola %s! Ya cotizamos tu envío y tu pedido está listo para pagar.</p>" +
                         "<table style=\"width:100%%;border-collapse:collapse;margin-bottom:24px;font-size:15px;\">" +
                         "<tr><td style=\"padding:8px 0;color:#6b7280;width:40%%;\">Orden ID</td><td style=\"padding:8px 0;color:#374151;font-weight:bold;\">#%d</td></tr>" +
+                        "<tr><td style=\"padding:8px 0;color:#6b7280;\">Total productos</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
                         "<tr><td style=\"padding:8px 0;color:#6b7280;\">Envío</td><td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
                         "<tr><td style=\"padding:8px 0;color:#6b7280;\">Total final</td><td style=\"padding:8px 0;color:#374151;font-weight:bold;\">%s</td></tr>" +
+                        "</table>" +
+                        "<p style=\"margin:0 0 8px 0;font-size:15px;color:#374151;font-weight:bold;\">Productos cotizados</p>" +
+                        "<table style=\"width:100%%;border-collapse:collapse;margin-bottom:24px;font-size:15px;\">" +
+                        "<thead>" +
+                        "<tr style=\"background-color:#f3f4f6;\">" +
+                        "<th style=\"padding:10px 8px;text-align:left;color:#374151;border-bottom:2px solid #e5e7eb;\">Producto</th>" +
+                        "<th style=\"padding:10px 8px;text-align:center;color:#374151;border-bottom:2px solid #e5e7eb;\">Cantidad</th>" +
+                        "<th style=\"padding:10px 8px;text-align:right;color:#374151;border-bottom:2px solid #e5e7eb;\">Precio unitario</th>" +
+                        "<th style=\"padding:10px 8px;text-align:right;color:#374151;border-bottom:2px solid #e5e7eb;\">Subtotal</th>" +
+                        "</tr>" +
+                        "</thead>" +
+                        "<tbody>%s</tbody>" +
                         "</table>" +
                         "<div style=\"text-align:center;margin:0 0 24px 0;\">" +
                         "<a href=\"%s\" style=\"display:inline-block;background-color:#facc15;color:#111827;font-size:16px;" +
@@ -273,8 +308,10 @@ public class EmailService {
                         "</div>",
                 HtmlUtils.htmlEscape(customerName),
                 data.orderId(),
+                formatCurrency(data.productsSubtotal()),
                 formatCurrency(data.shippingCost()),
                 formatCurrency(data.totalAmount()),
+                quoteItemRows,
                 orderDetailUrl
         );
 
@@ -441,5 +478,47 @@ public class EmailService {
             return fallback;
         }
         return value.trim();
+    }
+
+    private String buildShippingQuoteRequestItemRows(List<ShippingQuoteRequestedData.ShippingQuoteItemData> items) {
+        if (items == null || items.isEmpty()) {
+            return "<tr><td colspan=\"4\" style=\"padding:10px 8px;color:#6b7280;text-align:center;\">Sin productos</td></tr>";
+        }
+
+        return items.stream()
+                .map(item -> String.format(
+                        "<tr>" +
+                                "<td style=\"padding:10px 8px;border-bottom:1px solid #e5e7eb;color:#374151;\">%s</td>" +
+                                "<td style=\"padding:10px 8px;border-bottom:1px solid #e5e7eb;color:#374151;text-align:center;\">%d</td>" +
+                                "<td style=\"padding:10px 8px;border-bottom:1px solid #e5e7eb;color:#374151;text-align:right;\">%s</td>" +
+                                "<td style=\"padding:10px 8px;border-bottom:1px solid #e5e7eb;color:#374151;text-align:right;\">%s</td>" +
+                                "</tr>",
+                        HtmlUtils.htmlEscape(safeText(item.productName(), "Producto")),
+                        item.quantity() == null ? 0 : item.quantity(),
+                        formatCurrency(item.unitPrice()),
+                        formatCurrency(item.lineTotal())
+                ))
+                .collect(Collectors.joining());
+    }
+
+    private String buildShippingQuotePublishedItemRows(List<ShippingQuotePublishedData.ShippingQuoteItemData> items) {
+        if (items == null || items.isEmpty()) {
+            return "<tr><td colspan=\"4\" style=\"padding:10px 8px;color:#6b7280;text-align:center;\">Sin productos</td></tr>";
+        }
+
+        return items.stream()
+                .map(item -> String.format(
+                        "<tr>" +
+                                "<td style=\"padding:10px 8px;border-bottom:1px solid #e5e7eb;color:#374151;\">%s</td>" +
+                                "<td style=\"padding:10px 8px;border-bottom:1px solid #e5e7eb;color:#374151;text-align:center;\">%d</td>" +
+                                "<td style=\"padding:10px 8px;border-bottom:1px solid #e5e7eb;color:#374151;text-align:right;\">%s</td>" +
+                                "<td style=\"padding:10px 8px;border-bottom:1px solid #e5e7eb;color:#374151;text-align:right;\">%s</td>" +
+                                "</tr>",
+                        HtmlUtils.htmlEscape(safeText(item.productName(), "Producto")),
+                        item.quantity() == null ? 0 : item.quantity(),
+                        formatCurrency(item.unitPrice()),
+                        formatCurrency(item.lineTotal())
+                ))
+                .collect(Collectors.joining());
     }
 }

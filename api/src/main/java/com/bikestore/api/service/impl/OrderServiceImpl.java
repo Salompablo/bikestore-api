@@ -17,6 +17,8 @@ import com.bikestore.api.entity.enums.ReservationStatus;
 import com.bikestore.api.event.AdminOrderNotificationEvent;
 import com.bikestore.api.event.CustomerOrderConfirmationEvent;
 import com.bikestore.api.event.OrderPaidNotificationData;
+import com.bikestore.api.event.ShippingQuoteRequestedData;
+import com.bikestore.api.event.ShippingQuoteRequestedEvent;
 import com.bikestore.api.exception.ConflictException;
 import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.mapper.OrderMapper;
@@ -39,9 +41,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -62,6 +66,9 @@ public class OrderServiceImpl implements OrderService {
     @Value("${app.orders.reservation-ttl.shipping-quote-hours:24}")
     private int shippingQuoteReservationTtlHours;
 
+    @Value("${app.orders.reservation-ttl.quote-ready-hours:2}")
+    private int quoteReadyTtlHours;
+
     private static final Set<OrderStatus> CANCELLABLE_STATUSES = EnumSet.of(
             OrderStatus.INITIATED,
             OrderStatus.PENDING,
@@ -69,6 +76,10 @@ public class OrderServiceImpl implements OrderService {
             OrderStatus.QUOTE_READY_PAYMENT_PENDING
     );
     private static final Set<OrderStatus> HIDDEN_FROM_USER = EnumSet.of(OrderStatus.INITIATED);
+    private static final int SHIPPING_ADDRESS_MIN_LENGTH = 5;
+    private static final int SHIPPING_ADDRESS_MAX_LENGTH = 200;
+    private static final Pattern SHIPPING_ADDRESS_PATTERN = Pattern.compile("^[\\p{L}\\p{N}\\s.,#°'()/-]+$");
+    private static final Pattern ZIP_CODE_PATTERN = Pattern.compile("^(?:\\d{4}|[A-Z]\\d{4}[A-Z]{3})$");
 
     @Override
     @Transactional(readOnly = true)
@@ -127,14 +138,12 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public Order createPendingOrder(CheckoutRequest checkoutRequest, User authenticatedUser) {
         DeliveryMethod deliveryMethod = checkoutRequest.deliveryMethod();
+        String normalizedShippingAddress = null;
+        String normalizedZipCode = null;
 
         if (deliveryMethod == DeliveryMethod.SHIPPING) {
-            if (checkoutRequest.shippingAddress() == null || checkoutRequest.shippingAddress().isBlank()) {
-                throw new IllegalArgumentException("Shipping address is required for delivery orders");
-            }
-            if (checkoutRequest.zipCode() == null || checkoutRequest.zipCode().isBlank()) {
-                throw new IllegalArgumentException("ZIP code is required for delivery orders");
-            }
+            normalizedShippingAddress = normalizeShippingAddress(checkoutRequest.shippingAddress());
+            normalizedZipCode = normalizeZipCode(checkoutRequest.zipCode());
         }
 
         // Cancel any pre-existing active order for this user before creating a new one
@@ -199,8 +208,8 @@ public class OrderServiceImpl implements OrderService {
 
         if (deliveryMethod == DeliveryMethod.SHIPPING) {
             order.setShippingCost(BigDecimal.ZERO);
-            order.setShippingAddress(checkoutRequest.shippingAddress());
-            order.setZipCode(checkoutRequest.zipCode());
+            order.setShippingAddress(normalizedShippingAddress);
+            order.setZipCode(normalizedZipCode);
         } else {
             order.setShippingCost(BigDecimal.ZERO);
             order.setShippingAddress(null);
@@ -219,6 +228,18 @@ public class OrderServiceImpl implements OrderService {
         log.info("Order {} created in {} state with {} reservation(s), expires at {}",
                 savedOrder.getId(), savedOrder.getStatus(), consolidatedCart.size(), expiresAt);
         return savedOrder;
+    }
+
+    @Override
+    @Transactional
+    public Order createPendingShippingOrderAndNotify(CheckoutRequest checkoutRequest, User authenticatedUser) {
+        Order order = createPendingOrder(checkoutRequest, authenticatedUser);
+        if (order.getDeliveryMethod() != DeliveryMethod.SHIPPING) {
+            return order;
+        }
+
+        eventPublisher.publishEvent(new ShippingQuoteRequestedEvent(this, buildShippingQuoteRequestedData(order)));
+        return order;
     }
 
     @Override
@@ -260,6 +281,7 @@ public class OrderServiceImpl implements OrderService {
                 && normalizedShippingCost.compareTo(currentShippingCost) == 0
                 && order.getPreferenceId() != null
                 && !order.getPreferenceId().isBlank()) {
+            resetQuotePaymentWindow(order);
             return order;
         }
 
@@ -276,6 +298,7 @@ public class OrderServiceImpl implements OrderService {
             order.setPreferenceId(null);
         }
 
+        resetQuotePaymentWindow(order);
         return orderRepository.save(order);
     }
 
@@ -399,6 +422,87 @@ public class OrderServiceImpl implements OrderService {
 
     private void validateStatusTransition(Order order, OrderStatus newStatus) {
         transitionPolicy.validateTransition(order, newStatus);
+    }
+
+    /**
+     * Resets the payment window for a quote-ready order to {@code quoteReadyTtlHours} from now.
+     * Updates both the order's {@code quoteExpiresAt} and the {@code expiresAt} of all its ACTIVE
+     * stock reservations, so the cleanup scheduler cancels the order if the customer does not pay
+     * within that window.
+     */
+    private void resetQuotePaymentWindow(Order order) {
+        LocalDateTime newExpiry = LocalDateTime.now().plusHours(quoteReadyTtlHours);
+        order.setQuoteExpiresAt(newExpiry);
+        orderRepository.save(order);
+
+        List<StockReservation> activeReservations =
+                stockReservationRepository.findByOrderIdAndStatus(order.getId(), ReservationStatus.ACTIVE);
+        for (StockReservation reservation : activeReservations) {
+            reservation.setExpiresAt(newExpiry);
+            stockReservationRepository.save(reservation);
+        }
+        log.info("Quote payment window reset for order {}. Expires at {}.", order.getId(), newExpiry);
+    }
+
+    private String normalizeShippingAddress(String shippingAddress) {
+        if (shippingAddress == null || shippingAddress.isBlank()) {
+            throw new IllegalArgumentException("Shipping address is required for delivery orders");
+        }
+        String normalizedAddress = shippingAddress.trim().replaceAll("\\s+", " ");
+        if (normalizedAddress.length() < SHIPPING_ADDRESS_MIN_LENGTH || normalizedAddress.length() > SHIPPING_ADDRESS_MAX_LENGTH) {
+            throw new IllegalArgumentException("Shipping address must be between 5 and 200 characters");
+        }
+        if (!SHIPPING_ADDRESS_PATTERN.matcher(normalizedAddress).matches()) {
+            throw new IllegalArgumentException("Shipping address contains invalid characters");
+        }
+        return normalizedAddress;
+    }
+
+    private String normalizeZipCode(String zipCode) {
+        if (zipCode == null || zipCode.isBlank()) {
+            throw new IllegalArgumentException("ZIP code is required for delivery orders");
+        }
+        String normalizedZipCode = zipCode.trim().toUpperCase(Locale.ROOT);
+        if (!ZIP_CODE_PATTERN.matcher(normalizedZipCode).matches()) {
+            throw new IllegalArgumentException("ZIP code must be 4 digits or CPA format (A9999AAA)");
+        }
+        return normalizedZipCode;
+    }
+
+    private ShippingQuoteRequestedData buildShippingQuoteRequestedData(Order order) {
+        String firstName = order.getUser().getFirstName() == null ? "" : order.getUser().getFirstName().trim();
+        String lastName = order.getUser().getLastName() == null ? "" : order.getUser().getLastName().trim();
+        String fullName = (firstName + " " + lastName).trim();
+        if (fullName.isBlank()) {
+            fullName = "Cliente sin nombre";
+        }
+
+        List<ShippingQuoteRequestedData.ShippingQuoteItemData> items = order.getItems().stream()
+                .map(item -> {
+                    BigDecimal lineTotal = item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+                    return new ShippingQuoteRequestedData.ShippingQuoteItemData(
+                            item.getProduct().getName(),
+                            item.getQuantity(),
+                            item.getUnitPrice(),
+                            lineTotal
+                    );
+                })
+                .toList();
+
+        BigDecimal productsSubtotal = items.stream()
+                .map(ShippingQuoteRequestedData.ShippingQuoteItemData::lineTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new ShippingQuoteRequestedData(
+                order.getId(),
+                fullName,
+                order.getUser().getEmail(),
+                order.getContactPhone(),
+                order.getShippingAddress(),
+                order.getZipCode(),
+                productsSubtotal,
+                items
+        );
     }
 
     private OrderPaidNotificationData buildOrderPaidNotificationData(Order order) {

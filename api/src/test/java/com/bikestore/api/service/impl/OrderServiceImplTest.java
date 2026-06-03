@@ -1,6 +1,8 @@
 package com.bikestore.api.service.impl;
 
 import com.bikestore.api.dto.data.CustomerOrderConfirmationData;
+import com.bikestore.api.dto.request.CartItemRequest;
+import com.bikestore.api.dto.request.CheckoutRequest;
 import com.bikestore.api.entity.Category;
 import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.OrderItem;
@@ -31,9 +33,14 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -153,5 +160,81 @@ class OrderServiceImplTest {
         assertEquals(DeliveryMethod.STORE_PICKUP, customerData.deliveryMethod());
         assertNull(customerData.shippingAddress());
         assertNull(customerData.zipCode());
+    }
+
+    @Test
+    @DisplayName("createPendingOrder normalizes shipping address and zip code for SHIPPING")
+    void createPendingOrderNormalizesShippingData() {
+        User user = User.builder().id(10L).build();
+        Product product = Product.builder()
+                .id(1L)
+                .name("Bike")
+                .price(BigDecimal.valueOf(1000))
+                .stock(10)
+                .reservedStock(0)
+                .build();
+
+        CheckoutRequest request = new CheckoutRequest(
+                List.of(new CartItemRequest(1L, 1)),
+                DeliveryMethod.SHIPPING,
+                "  Av. Colón   1234,   Mar del Plata  ",
+                "  b7600abc  ",
+                null,
+                "+5492235551234",
+                false
+        );
+
+        when(orderRepository.findByUserIdAndStatusIn(anyLong(), any())).thenReturn(List.of());
+        when(productRepository.findByIdWithLock(1L)).thenReturn(Optional.of(product));
+        when(productRepository.reserveStock(1L, 1)).thenReturn(1);
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(stockReservationRepository.save(any(StockReservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Order created = orderService.createPendingOrder(request, user);
+
+        assertNotNull(created);
+        assertEquals("Av. Colón 1234, Mar del Plata", created.getShippingAddress());
+        assertEquals("B7600ABC", created.getZipCode());
+        assertEquals(OrderStatus.QUOTE_REQUESTED, created.getStatus());
+    }
+
+    @Test
+    @DisplayName("createPendingOrder rejects invalid shipping zip code format")
+    void createPendingOrderRejectsInvalidZipCodeFormat() {
+        User user = User.builder().id(10L).build();
+        CheckoutRequest request = new CheckoutRequest(
+                List.of(new CartItemRequest(1L, 1)),
+                DeliveryMethod.SHIPPING,
+                "Av. Colón 1234",
+                "76-00",
+                null,
+                "+5492235551234",
+                false
+        );
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> orderService.createPendingOrder(request, user));
+
+        assertEquals("ZIP code must be 4 digits or CPA format (A9999AAA)", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("createPendingOrder rejects invalid shipping address characters")
+    void createPendingOrderRejectsInvalidAddressCharacters() {
+        User user = User.builder().id(10L).build();
+        CheckoutRequest request = new CheckoutRequest(
+                List.of(new CartItemRequest(1L, 1)),
+                DeliveryMethod.SHIPPING,
+                "Av. Colón 1234 <>",
+                "7600",
+                null,
+                "+5492235551234",
+                false
+        );
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> orderService.createPendingOrder(request, user));
+
+        assertEquals("Shipping address contains invalid characters", ex.getMessage());
     }
 }

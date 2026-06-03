@@ -10,6 +10,7 @@ import com.bikestore.api.entity.User;
 import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.entity.enums.Role;
 import com.bikestore.api.event.ShippingQuotePublishedData;
+import com.bikestore.api.event.ShippingQuoteRequestedData;
 import com.bikestore.api.repository.CategoryRepository;
 import com.bikestore.api.repository.OrderRepository;
 import com.bikestore.api.repository.ProductRepository;
@@ -62,6 +63,8 @@ class ShippingQuotePublishEmailFlowIntegrationTest {
     private EmailService emailService;
 
     private User testUser;
+    private Product checkoutProduct;
+    private Long createdOrderId;
 
     @BeforeEach
     void setUp() {
@@ -75,7 +78,7 @@ class ShippingQuotePublishEmailFlowIntegrationTest {
                 .name("Shipping Email Category " + UUID.randomUUID())
                 .build());
 
-        Product product = productRepository.save(Product.builder()
+        checkoutProduct = productRepository.save(Product.builder()
                 .sku("SKU-" + UUID.randomUUID())
                 .name("Email Trigger Bike")
                 .price(BigDecimal.valueOf(1000))
@@ -93,7 +96,7 @@ class ShippingQuotePublishEmailFlowIntegrationTest {
                 .build());
 
         CheckoutRequest shippingCheckout = new CheckoutRequest(
-                List.of(new CartItemRequest(product.getId(), 1)),
+                List.of(new CartItemRequest(checkoutProduct.getId(), 1)),
                 DeliveryMethod.SHIPPING,
                 "Calle Test 123",
                 "7600",
@@ -103,8 +106,17 @@ class ShippingQuotePublishEmailFlowIntegrationTest {
         );
 
         CheckoutResponse response = checkoutFacade.initializeCheckout(shippingCheckout, testUser);
+        createdOrderId = response.orderId();
         when(paymentGatewayService.createPreference(any()))
                 .thenReturn(new CheckoutInfo("pref-test-" + response.orderId(), "https://mp.test/init"));
+    }
+
+    @Test
+    @DisplayName("Requesting shipping quote triggers admin email flow after commit")
+    void requestShippingQuoteTriggersAdminEmailFlow() {
+        verify(emailService, timeout(3000)).sendAdminShippingQuoteRequest(any(), argThat(data ->
+                hasExpectedAdminEmailData(data, createdOrderId, testUser.getEmail())
+        ));
     }
 
     @Test
@@ -129,6 +141,28 @@ class ShippingQuotePublishEmailFlowIntegrationTest {
     ) {
         return data != null
                 && expectedOrderId.equals(data.orderId())
-                && expectedEmail.equals(data.customerEmail());
+                && expectedEmail.equals(data.customerEmail())
+                && BigDecimal.valueOf(1000).compareTo(data.productsSubtotal()) == 0
+                && data.items() != null
+                && data.items().size() == 1
+                && "Email Trigger Bike".equals(data.items().getFirst().productName())
+                && data.items().getFirst().quantity() == 1
+                && BigDecimal.valueOf(1000).compareTo(data.items().getFirst().lineTotal()) == 0;
+    }
+
+    private boolean hasExpectedAdminEmailData(
+            ShippingQuoteRequestedData data,
+            Long expectedOrderId,
+            String expectedEmail
+    ) {
+        return data != null
+                && expectedOrderId.equals(data.orderId())
+                && expectedEmail.equals(data.customerEmail())
+                && BigDecimal.valueOf(1000).compareTo(data.productsSubtotal()) == 0
+                && data.items() != null
+                && data.items().size() == 1
+                && "Email Trigger Bike".equals(data.items().getFirst().productName())
+                && data.items().getFirst().quantity() == 1
+                && BigDecimal.valueOf(1000).compareTo(data.items().getFirst().lineTotal()) == 0;
     }
 }
