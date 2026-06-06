@@ -17,6 +17,8 @@ import com.bikestore.api.entity.enums.ReservationStatus;
 import com.bikestore.api.event.AdminOrderNotificationEvent;
 import com.bikestore.api.event.CustomerOrderConfirmationEvent;
 import com.bikestore.api.event.OrderPaidNotificationData;
+import com.bikestore.api.event.OrderStatusUpdatedData;
+import com.bikestore.api.event.OrderStatusUpdatedEvent;
 import com.bikestore.api.event.ShippingQuoteRequestedData;
 import com.bikestore.api.event.ShippingQuoteRequestedEvent;
 import com.bikestore.api.exception.ConflictException;
@@ -75,6 +77,10 @@ public class OrderServiceImpl implements OrderService {
             OrderStatus.QUOTE_REQUESTED,
             OrderStatus.QUOTE_READY_PAYMENT_PENDING
     );
+    private static final Set<OrderStatus> NOTIFIABLE_STATUSES = EnumSet.of(
+            OrderStatus.READY_FOR_PICKUP,
+            OrderStatus.SHIPPED
+    );
     private static final Set<OrderStatus> HIDDEN_FROM_USER = EnumSet.of(OrderStatus.INITIATED);
     private static final int SHIPPING_ADDRESS_MIN_LENGTH = 5;
     private static final int SHIPPING_ADDRESS_MAX_LENGTH = 200;
@@ -130,6 +136,11 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(newStatus);
         Order updatedOrder = orderRepository.save(order);
+
+        if (NOTIFIABLE_STATUSES.contains(newStatus)) {
+            eventPublisher.publishEvent(
+                    new OrderStatusUpdatedEvent(this, buildOrderStatusUpdatedData(updatedOrder)));
+        }
 
         return orderMapper.toOrderResponse(updatedOrder);
     }
@@ -557,6 +568,33 @@ public class OrderServiceImpl implements OrderService {
                 order.getDeliveryMethod(),
                 order.getDeliveryMethod() == DeliveryMethod.SHIPPING ? order.getShippingAddress() : null,
                 order.getDeliveryMethod() == DeliveryMethod.SHIPPING ? order.getZipCode() : null
+        );
+    }
+
+    private OrderStatusUpdatedData buildOrderStatusUpdatedData(Order order) {
+        String firstName = order.getUser().getFirstName() == null ? "" : order.getUser().getFirstName().trim();
+        String lastName = order.getUser().getLastName() == null ? "" : order.getUser().getLastName().trim();
+        String fullName = (firstName + " " + lastName).trim();
+        if (fullName.isBlank()) {
+            fullName = "Cliente";
+        }
+
+        List<String> productPreviewImages = order.getItems().stream()
+                .map(OrderItem::getProduct)
+                .filter(Objects::nonNull)
+                .map(this::resolveProductPreviewImage)
+                .filter(Objects::nonNull)
+                .limit(3)
+                .toList();
+
+        return new OrderStatusUpdatedData(
+                order.getId(),
+                fullName,
+                order.getUser().getEmail(),
+                order.getStatus(),
+                order.getDeliveryMethod(),
+                order.getTotalAmount(),
+                productPreviewImages
         );
     }
 
