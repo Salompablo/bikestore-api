@@ -22,7 +22,7 @@ public record RegisterRequest(
 
         @Schema(description = "User's password", example = "MyOwnPassword")
         @NotBlank(message = "Password is required")
-        @Size(min = 6, max = 15, message = "Password must be between 6 and 15 characters long")
+        @Size(min = 8, max = 15, message = "Password must be between 8 and 15 characters long")
         String password
 ) {
 
