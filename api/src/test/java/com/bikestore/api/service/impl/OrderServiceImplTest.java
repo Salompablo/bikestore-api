@@ -15,10 +15,13 @@ import com.bikestore.api.entity.enums.ReservationStatus;
 import com.bikestore.api.event.AdminOrderNotificationEvent;
 import com.bikestore.api.event.CustomerOrderConfirmationEvent;
 import com.bikestore.api.event.OrderPaidNotificationData;
+import com.bikestore.api.event.OrderStatusUpdatedData;
+import com.bikestore.api.event.OrderStatusUpdatedEvent;
 import com.bikestore.api.mapper.OrderMapper;
 import com.bikestore.api.repository.OrderRepository;
 import com.bikestore.api.repository.ProductRepository;
 import com.bikestore.api.repository.StockReservationRepository;
+import com.bikestore.api.service.OrderStatusTransitionPolicy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -62,6 +66,9 @@ class OrderServiceImplTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private OrderStatusTransitionPolicy transitionPolicy;
 
     @InjectMocks
     private OrderServiceImpl orderService;
@@ -236,5 +243,139 @@ class OrderServiceImplTest {
                 () -> orderService.createPendingOrder(request, user));
 
         assertEquals("Shipping address contains invalid characters", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("updateOrderStatus to READY_FOR_PICKUP publishes OrderStatusUpdatedEvent with correct data")
+    void updateOrderStatusToReadyForPickupPublishesEvent() {
+        Product product = Product.builder()
+                .id(1L)
+                .name("Bike One")
+                .price(BigDecimal.valueOf(1000))
+                .stock(10)
+                .reservedStock(0)
+                .images(List.of("https://cdn.example.com/bike.jpg"))
+                .build();
+
+        OrderItem item = OrderItem.builder()
+                .product(product)
+                .quantity(1)
+                .unitPrice(BigDecimal.valueOf(1000))
+                .build();
+
+        User user = User.builder()
+                .email("customer@test.com")
+                .firstName("Ana")
+                .lastName("Gomez")
+                .build();
+
+        Order order = Order.builder()
+                .id(42L)
+                .user(user)
+                .status(OrderStatus.PAID)
+                .deliveryMethod(DeliveryMethod.STORE_PICKUP)
+                .totalAmount(BigDecimal.valueOf(1000))
+                .items(List.of(item))
+                .build();
+
+        when(orderRepository.findById(42L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(order)).thenReturn(order);
+
+        orderService.updateOrderStatus(42L, OrderStatus.READY_FOR_PICKUP);
+
+        ArgumentCaptor<ApplicationEvent> captor = ArgumentCaptor.forClass(ApplicationEvent.class);
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+
+        ApplicationEvent published = captor.getValue();
+        assertTrue(published instanceof OrderStatusUpdatedEvent);
+
+        OrderStatusUpdatedData data = ((OrderStatusUpdatedEvent) published).getData();
+        assertEquals(42L, data.orderId());
+        assertEquals("Ana Gomez", data.customerName());
+        assertEquals("customer@test.com", data.customerEmail());
+        assertEquals(OrderStatus.READY_FOR_PICKUP, data.newStatus());
+        assertEquals(DeliveryMethod.STORE_PICKUP, data.deliveryMethod());
+        assertEquals(BigDecimal.valueOf(1000), data.totalAmount());
+        assertEquals(1, data.productPreviewImages().size());
+        assertEquals("https://cdn.example.com/bike.jpg", data.productPreviewImages().get(0));
+    }
+
+    @Test
+    @DisplayName("updateOrderStatus to SHIPPED publishes OrderStatusUpdatedEvent with correct data")
+    void updateOrderStatusToShippedPublishesEvent() {
+        Product product = Product.builder()
+                .id(2L)
+                .name("Bike Two")
+                .price(BigDecimal.valueOf(2000))
+                .stock(5)
+                .reservedStock(0)
+                .images(List.of())
+                .build();
+
+        OrderItem item = OrderItem.builder()
+                .product(product)
+                .quantity(1)
+                .unitPrice(BigDecimal.valueOf(2000))
+                .build();
+
+        User user = User.builder()
+                .email("rider@test.com")
+                .firstName("Carlos")
+                .lastName("Lopez")
+                .build();
+
+        Order order = Order.builder()
+                .id(55L)
+                .user(user)
+                .status(OrderStatus.PAID)
+                .deliveryMethod(DeliveryMethod.SHIPPING)
+                .totalAmount(BigDecimal.valueOf(2000))
+                .items(List.of(item))
+                .build();
+
+        when(orderRepository.findById(55L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(order)).thenReturn(order);
+
+        orderService.updateOrderStatus(55L, OrderStatus.SHIPPED);
+
+        ArgumentCaptor<ApplicationEvent> captor = ArgumentCaptor.forClass(ApplicationEvent.class);
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+
+        ApplicationEvent published = captor.getValue();
+        assertTrue(published instanceof OrderStatusUpdatedEvent);
+
+        OrderStatusUpdatedData data = ((OrderStatusUpdatedEvent) published).getData();
+        assertEquals(55L, data.orderId());
+        assertEquals("Carlos Lopez", data.customerName());
+        assertEquals("rider@test.com", data.customerEmail());
+        assertEquals(OrderStatus.SHIPPED, data.newStatus());
+        assertEquals(DeliveryMethod.SHIPPING, data.deliveryMethod());
+        assertTrue(data.productPreviewImages().isEmpty());
+    }
+
+    @Test
+    @DisplayName("updateOrderStatus to a non-notifiable status does not publish any event")
+    void updateOrderStatusToPickedUpDoesNotPublishEvent() {
+        User user = User.builder()
+                .email("customer@test.com")
+                .firstName("Maria")
+                .lastName("Perez")
+                .build();
+
+        Order order = Order.builder()
+                .id(77L)
+                .user(user)
+                .status(OrderStatus.READY_FOR_PICKUP)
+                .deliveryMethod(DeliveryMethod.STORE_PICKUP)
+                .totalAmount(BigDecimal.valueOf(500))
+                .items(List.of())
+                .build();
+
+        when(orderRepository.findById(77L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(order)).thenReturn(order);
+
+        orderService.updateOrderStatus(77L, OrderStatus.PICKED_UP);
+
+        verify(eventPublisher, never()).publishEvent(any(ApplicationEvent.class));
     }
 }

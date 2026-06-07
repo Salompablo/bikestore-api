@@ -2,6 +2,8 @@ package com.bikestore.api.service;
 
 import com.bikestore.api.dto.data.CustomerOrderConfirmationData;
 import com.bikestore.api.entity.enums.DeliveryMethod;
+import com.bikestore.api.entity.enums.OrderStatus;
+import com.bikestore.api.event.OrderStatusUpdatedData;
 import com.bikestore.api.event.ShippingQuotePublishedData;
 import com.bikestore.api.event.ShippingQuoteRequestedData;
 import com.bikestore.api.event.OrderPaidNotificationData;
@@ -217,6 +219,92 @@ public class EmailService {
                 buildEmailTemplate("Compra confirmada", content)
         );
         log.info("✅ Customer order confirmation email processed for order {}", data.orderId());
+    }
+
+    public void sendOrderStatusNotification(OrderStatusUpdatedData data) {
+        String customerName = safeText(data.customerName(), "Cliente");
+        String orderDetailUrl = buildFrontendUrl("/orders/" + data.orderId());
+        String imageGroup = buildProductPreviewImages(data.productPreviewImages());
+        boolean isPickup = data.newStatus() == OrderStatus.READY_FOR_PICKUP;
+
+        String iconColor = isPickup ? "#f59e0b" : "#3b82f6";
+        String headline = isPickup
+                ? "&#161;Tu pedido est&aacute; listo para retirar, " + HtmlUtils.htmlEscape(customerName) + "!"
+                : "&#161;Tu pedido est&aacute; en camino, " + HtmlUtils.htmlEscape(customerName) + "!";
+        String subtext = isPickup
+                ? "Ya prepar&aacute;mos tu pedido <strong>#" + data.orderId() + "</strong> "
+                + "y te espera en nuestra tienda."
+                : "Tu pedido <strong>#" + data.orderId() + "</strong> fue despachado "
+                + "y est&aacute; en camino hacia vos.";
+        String emailSubject = isPickup
+                ? "Tu pedido está listo para retirar #" + data.orderId()
+                : "Tu pedido fue enviado #" + data.orderId();
+        String emailTitle = isPickup ? "Pedido listo para retirar" : "Pedido enviado";
+
+        String statusBox;
+        if (isPickup) {
+            statusBox = String.format(
+                    "<div style=\"margin:0 0 24px 0;padding:20px;border:1px solid #fde68a;border-radius:12px;" +
+                    "background-color:#fffbeb;text-align:left;\">" +
+                    "<p style=\"margin:0 0 8px 0;font-size:15px;font-weight:700;color:#92400e;\">Datos de retiro</p>" +
+                    "<p style=\"margin:0 0 6px 0;font-size:14px;color:#374151;\">" +
+                    "<strong>Direcci&oacute;n:</strong> %s</p>" +
+                    "<p style=\"margin:0;font-size:14px;color:#374151;\">" +
+                    "<strong>Horario:</strong> Lunes a S&aacute;bados de 09:00 a 19:00 hs</p>" +
+                    "</div>",
+                    HtmlUtils.htmlEscape(safeText(storeAddress, "Santa Fe 2611, Mar del Plata"))
+            );
+        } else {
+            statusBox = "<div style=\"margin:0 0 24px 0;padding:20px;border:1px solid #bfdbfe;border-radius:12px;" +
+                    "background-color:#eff6ff;text-align:left;\">" +
+                    "<p style=\"margin:0 0 8px 0;font-size:15px;font-weight:700;color:#1e40af;\">Tu env&iacute;o est&aacute; en camino</p>" +
+                    "<p style=\"margin:0;font-size:14px;color:#374151;\">En breve recibir&aacute;s tu pedido. " +
+                    "Pod&eacute;s seguir el estado desde el detalle de tu pedido.</p>" +
+                    "</div>";
+        }
+
+        String content = String.format(
+                "<div style=\"text-align:center;padding-top:8px;\">" +
+                "<div style=\"width:64px;height:64px;border-radius:50%%;background-color:%s;" +
+                "margin:0 auto 16px auto;line-height:64px;text-align:center;font-size:34px;" +
+                "font-weight:bold;color:#ffffff;\">&#10003;</div>" +
+                "<h1 style=\"margin:0 0 10px 0;font-size:28px;line-height:1.2;color:#111827;font-weight:700;\">%s</h1>" +
+                "<p style=\"margin:0 0 24px 0;font-size:16px;line-height:1.5;color:#4b5563;\">%s</p>" +
+                "%s" +
+                "<div style=\"margin:0 0 24px 0;padding:20px;border:1px solid #e5e7eb;border-radius:12px;" +
+                "background-color:#f9fafb;text-align:left;\">" +
+                "<p style=\"margin:0 0 10px 0;font-size:14px;color:#6b7280;\">Orden</p>" +
+                "<p style=\"margin:0 0 16px 0;font-size:24px;color:#111827;font-weight:700;\">#%d</p>" +
+                "<p style=\"margin:0 0 8px 0;font-size:14px;color:#6b7280;\">Total abonado</p>" +
+                "<p style=\"margin:0;font-size:30px;color:#111827;font-weight:700;\">%s</p>" +
+                "</div>" +
+                "%s" +
+                "<div style=\"text-align:center;margin:0 0 28px 0;\">" +
+                "<a href=\"%s\" style=\"display:inline-block;background-color:#1f2937;color:#ffffff;" +
+                "font-size:16px;font-weight:700;text-decoration:none;padding:14px 28px;border-radius:999px;\">" +
+                "Ver detalle del pedido</a>" +
+                "</div>" +
+                "<p style=\"margin:0;font-size:12px;line-height:1.6;color:#9ca3af;text-align:center;\">" +
+                "Te enviamos este correo porque el e-mail %s est&aacute; asociado a una cuenta de Bikes Asaro.</p>" +
+                "</div>",
+                iconColor,
+                headline,
+                subtext,
+                imageGroup,
+                data.orderId(),
+                formatCurrency(data.totalAmount()),
+                statusBox,
+                orderDetailUrl,
+                HtmlUtils.htmlEscape(safeText(data.customerEmail(), "sin-email"))
+        );
+
+        sendHtmlEmail(
+                data.customerEmail(),
+                emailSubject,
+                buildEmailTemplate(emailTitle, content)
+        );
+        log.info("✅ Order status notification email processed for order {} (status: {})",
+                data.orderId(), data.newStatus());
     }
 
     public void sendAdminShippingQuoteRequest(String toEmail, ShippingQuoteRequestedData data) {
