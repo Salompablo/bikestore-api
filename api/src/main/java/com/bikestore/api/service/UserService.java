@@ -1,5 +1,7 @@
 package com.bikestore.api.service;
 
+import com.bikestore.api.dto.request.ChangePasswordRequest;
+import com.bikestore.api.dto.request.UpdateProfileRequest;
 import com.bikestore.api.dto.response.UserResponse;
 import com.bikestore.api.entity.User;
 import org.springframework.data.domain.Page;
@@ -10,4 +12,6 @@ public interface UserService {
     Page<UserResponse> getAllUsers(Pageable pageable);
     void updateDefaultPhone(User user, String phone);
     UserResponse getMyProfile(User user);
+    UserResponse updateProfile(User user, UpdateProfileRequest request);
+    void changePassword(User user, ChangePasswordRequest request);
 }
