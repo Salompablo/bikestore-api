@@ -411,35 +411,35 @@ public class EmailService {
     }
 
     public void sendAdminContactNotification(String toEmail, com.bikestore.api.entity.ContactMessage msg) {
-        String phone = msg.getPhone() == null || msg.getPhone().isBlank() ? "Not provided" : msg.getPhone();
-        String orderId = msg.getOrderId() == null ? "N/A" : "#" + msg.getOrderId();
+        String phone = msg.getPhone() == null || msg.getPhone().isBlank() ? "No informado" : msg.getPhone();
+        String orderId = msg.getOrderId() == null ? "No aplica" : "#" + msg.getOrderId();
 
         String content = String.format(
-                "<p style=\"margin:0 0 16px 0;font-size:16px;color:#374151;\">A new contact message has been received.</p>" +
+                "<p style=\"margin:0 0 16px 0;font-size:16px;color:#374151;\">Se recibió un nuevo mensaje de contacto.</p>" +
                 "<table style=\"width:100%%;border-collapse:collapse;margin-bottom:24px;font-size:15px;\">" +
-                "<tr><td style=\"padding:8px 0;color:#6b7280;width:40%%;\">Name</td>" +
+                "<tr><td style=\"padding:8px 0;color:#6b7280;width:40%%;\">Nombre</td>" +
                     "<td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
                 "<tr><td style=\"padding:8px 0;color:#6b7280;\">Email</td>" +
                     "<td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
-                "<tr><td style=\"padding:8px 0;color:#6b7280;\">Phone</td>" +
+                "<tr><td style=\"padding:8px 0;color:#6b7280;\">Teléfono</td>" +
                     "<td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
-                "<tr><td style=\"padding:8px 0;color:#6b7280;\">Order</td>" +
+                "<tr><td style=\"padding:8px 0;color:#6b7280;\">Pedido</td>" +
                     "<td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
-                "<tr><td style=\"padding:8px 0;color:#6b7280;\">Topic</td>" +
+                "<tr><td style=\"padding:8px 0;color:#6b7280;\">Tema</td>" +
                     "<td style=\"padding:8px 0;color:#374151;\">%s</td></tr>" +
                 "</table>" +
-                "<p style=\"margin:0 0 8px 0;font-size:15px;color:#374151;font-weight:bold;\">Message</p>" +
+                "<p style=\"margin:0 0 8px 0;font-size:15px;color:#374151;font-weight:bold;\">Mensaje</p>" +
                 "<div style=\"padding:16px;background-color:#f3f4f6;border-radius:8px;font-size:15px;color:#374151;line-height:1.6;\">%s</div>",
-                HtmlUtils.htmlEscape(safeText(msg.getName(), "Unknown")),
-                HtmlUtils.htmlEscape(safeText(msg.getEmail(), "Unknown")),
+                HtmlUtils.htmlEscape(safeText(msg.getName(), "Sin nombre")),
+                HtmlUtils.htmlEscape(safeText(msg.getEmail(), "Sin correo")),
                 HtmlUtils.htmlEscape(phone),
                 HtmlUtils.htmlEscape(orderId),
                 HtmlUtils.htmlEscape(msg.getTopic().name()),
                 HtmlUtils.htmlEscape(safeText(msg.getMessage(), ""))
         );
 
-        sendHtmlEmail(toEmail, "New contact message – " + msg.getTopic().name(),
-                buildEmailTemplate("New Contact Message", content));
+        sendHtmlEmail(toEmail, "Nuevo mensaje de contacto – " + msg.getTopic().name(),
+                buildEmailTemplate("Nuevo mensaje de contacto", content));
         log.info("✅ Admin contact notification sent for message id={}", msg.getId());
     }
 
