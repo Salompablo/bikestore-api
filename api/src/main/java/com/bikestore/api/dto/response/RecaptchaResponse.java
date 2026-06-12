@@ -9,7 +9,7 @@ import java.util.List;
  */
 public record RecaptchaResponse(
         boolean success,
-        double score,
+        Double score,
         String action,
         @JsonProperty("challenge_ts") String challengeTs,
         String hostname,

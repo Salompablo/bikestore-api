@@ -25,12 +25,11 @@ public class CaptchaValidationService {
     private final double minimumScore;
 
     public CaptchaValidationService(
-            RestClient.Builder restClientBuilder,
             @Value("${recaptcha.secret-key}") String secretKey,
             @Value("${recaptcha.verify-url}") String verifyUrl,
             @Value("${recaptcha.minimum-score}") double minimumScore
     ) {
-        this.restClient = restClientBuilder.build();
+        this.restClient = RestClient.create();
         this.secretKey = secretKey;
         this.verifyUrl = verifyUrl;
         this.minimumScore = minimumScore;
@@ -61,10 +60,8 @@ public class CaptchaValidationService {
             throw new ConflictException("reCAPTCHA verification failed. Please try again.");
         }
 
-        if (response.score() < minimumScore) {
-            log.warn("reCAPTCHA score too low: {} (minimum: {})", response.score(), minimumScore);
-            throw new ConflictException(
-                    "reCAPTCHA score too low. Suspicious bot-like behaviour detected.");
+        if (response.score() == null || response.score() < minimumScore) {
+            throw new ConflictException("Automated bot behavior detected. Request blocked.");
         }
 
         if (!EXPECTED_ACTION.equals(response.action())) {
