@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/v1/products/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/products/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/*/reviews").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
