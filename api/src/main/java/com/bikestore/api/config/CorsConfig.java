@@ -42,7 +42,7 @@ public class CorsConfig {
         FilterRegistrationBean<CorsFilter> registration = new FilterRegistrationBean<>(new CorsFilter(corsConfigurationSource));
 
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
-        
+
         registration.addUrlPatterns("/*");
 
         return registration;

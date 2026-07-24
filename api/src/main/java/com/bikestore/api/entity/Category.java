@@ -19,9 +19,10 @@ public class Category {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "default_image_url", length = 512)
+    @Column(name = "default_image_url", length = 1024)
     private String defaultImageUrl;
 
     @Column(name = "is_active")

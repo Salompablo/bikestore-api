@@ -55,7 +55,6 @@ public class AuthService {
         String verificationCode = tokenService.generateAndSaveVerificationToken(user);
 
         eventPublisher.publishEvent(new SendEmailEvent(this, user.getEmail(), verificationCode, SendEmailEvent.EmailType.VERIFICATION));
-        log.info("⚙️ DEV MODE - Verification code for {}: {}", user.getEmail(), verificationCode);
 
         return new AuthResponse("", "User registered successfully. Please check your email for the verification code.");
     }
