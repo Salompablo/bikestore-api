@@ -30,7 +30,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return CorsUtils.isPreFlightRequest(request);
+        String path = request.getServletPath();
+
+        return CorsUtils.isPreFlightRequest(request) || path.startsWith("/api/v1/webhook/");
     }
 
     @Override
