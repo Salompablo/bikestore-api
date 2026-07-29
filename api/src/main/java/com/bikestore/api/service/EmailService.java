@@ -45,8 +45,6 @@ public class EmailService {
     // -------------------------------------------------------------------------
 
     public void sendVerificationEmail(String toEmail, String verificationCode) {
-        log.info("📧 [DEV MODE] Generating email to: {}", toEmail);
-        log.info("🔑 Verification code: {}", verificationCode);
 
         String content =
                 "<p style=\"margin:0 0 16px 0;font-size:16px;color:#374151;\">¡Bienvenido a <strong>Bikes Asaro</strong>! " +
@@ -61,8 +59,6 @@ public class EmailService {
     }
 
     public void sendReactivationEmail(String toEmail, String verificationCode) {
-        log.info("📧 [DEV MODE] Generating reactivation email to: {}", toEmail);
-        log.info("🔑 Reactivation code: {}", verificationCode);
 
         String content =
                 "<p style=\"margin:0 0 16px 0;font-size:16px;color:#374151;\">¡Te extrañábamos! " +
@@ -76,8 +72,6 @@ public class EmailService {
     }
 
     public void sendPasswordResetEmail(String toEmail, String resetCode) {
-        log.info("📧 [DEV MODE] Generating password reset email to: {}", toEmail);
-        log.info("🔑 Password reset code: {}", resetCode);
 
         String content =
                 "<p style=\"margin:0 0 8px 0;font-size:16px;color:#374151;\">Recibimos una solicitud para " +
@@ -154,7 +148,7 @@ public class EmailService {
 
         Resend resend = new Resend(resendApiKey);
         CreateEmailOptions params = CreateEmailOptions.builder()
-                .from("Bikes Asaro <onboarding@resend.dev>")
+                .from("Bikes Asaro <ventas@bikesasaro.com.ar>")
                 .to(toEmail)
                 .subject("Nueva orden pagada #" + orderData.orderId())
                 .html(html)
@@ -450,7 +444,7 @@ public class EmailService {
     private void sendHtmlEmail(String toEmail, String subject, String html) {
         Resend resend = new Resend(resendApiKey);
         CreateEmailOptions params = CreateEmailOptions.builder()
-                .from("Bikes Asaro <onboarding@resend.dev>")
+                .from("Bikes Asaro <no-reply@bikesasaro.com.ar>")
                 .to(toEmail)
                 .subject(subject)
                 .html(html)
