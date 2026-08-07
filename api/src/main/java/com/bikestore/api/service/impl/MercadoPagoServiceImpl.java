@@ -24,9 +24,6 @@ import java.util.List;
 @Slf4j
 public class MercadoPagoServiceImpl implements PaymentGatewayService {
 
-    @Value("${mercadopago.notification-url}")
-    private String notificationUrl;
-
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
@@ -64,8 +61,7 @@ public class MercadoPagoServiceImpl implements PaymentGatewayService {
             PreferenceRequest.PreferenceRequestBuilder requestBuilder = PreferenceRequest.builder()
                     .items(mpItems)
                     .backUrls(backUrls)
-                    .externalReference(order.getId().toString())
-                    .notificationUrl(notificationUrl);
+                    .externalReference(order.getId().toString());
 
             if (frontendUrl.startsWith("https://")) {
                 requestBuilder.autoReturn("approved");
