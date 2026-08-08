@@ -16,6 +16,8 @@ public class VerificationTokenService {
     private final VerificationTokenRepository verificationTokenRepository;
 
     public String generateAndSaveVerificationToken(User user) {
+        verificationTokenRepository.findByUser(user).ifPresent(verificationTokenRepository::delete);
+
         String verificationCode = String.format("%06d", new Random().nextInt(1000000));
 
         VerificationToken verificationToken = VerificationToken.builder()
