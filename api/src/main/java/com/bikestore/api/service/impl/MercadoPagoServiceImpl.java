@@ -1,15 +1,18 @@
 package com.bikestore.api.service.impl;
 
 import com.bikestore.api.dto.response.CheckoutInfo;
+import com.bikestore.api.dto.response.MerchantOrderInfo;
 import com.bikestore.api.dto.response.PaymentInfo;
 import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.OrderItem;
 import com.bikestore.api.service.PaymentGatewayService;
+import com.mercadopago.client.merchantorder.MerchantOrderClient;
 import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
 import com.mercadopago.client.preference.PreferenceClient;
 import com.mercadopago.client.preference.PreferenceItemRequest;
 import com.mercadopago.client.preference.PreferenceRequest;
+import com.mercadopago.resources.merchantorder.MerchantOrder;
 import com.mercadopago.resources.payment.Payment;
 import com.mercadopago.resources.preference.Preference;
 import lombok.extern.slf4j.Slf4j;
@@ -90,6 +93,25 @@ public class MercadoPagoServiceImpl implements PaymentGatewayService {
             );
         } catch (Exception e) {
             log.error("Error retrieving MP payment: " + paymentId, e);
+            throw new RuntimeException("Mercado Pago API error");
+        }
+    }
+
+    @Override
+    public MerchantOrderInfo getMerchantOrderInfo(Long merchantOrderId) {
+        try {
+            MerchantOrderClient merchantOrderClient = new MerchantOrderClient();
+            MerchantOrder merchantOrder = merchantOrderClient.get(merchantOrderId);
+
+            return new MerchantOrderInfo(
+                    merchantOrder.getStatus(),
+                    merchantOrder.getOrderStatus(),
+                    merchantOrder.getExternalReference(),
+                    merchantOrder.getPaidAmount(),
+                    merchantOrder.getTotalAmount()
+            );
+        } catch (Exception e) {
+            log.error("Error retrieving MP merchant order: " + merchantOrderId, e);
             throw new RuntimeException("Mercado Pago API error");
         }
     }

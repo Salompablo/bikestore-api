@@ -50,10 +50,10 @@ public class WebhookController {
             @Parameter(description = "Unique request ID for signature validation")
             @RequestHeader(value = "x-request-id", required = false) String xRequestId,
 
-            @Parameter(description = "Payment ID sent via V1 Webhook URL")
+            @Parameter(description = "Mercado Pago resource ID sent via V1 Webhook URL")
             @RequestParam(value = "data.id", required = false) String dataIdUrl,
 
-            @Parameter(description = "Payment ID sent via V2 IPN URL")
+            @Parameter(description = "Mercado Pago resource ID sent via V2 IPN URL")
             @RequestParam(value = "id", required = false) String ipnId,
 
             @Parameter(description = "Topic of the IPN (e.g., 'payment' or 'merchant_order')")
@@ -74,12 +74,6 @@ public class WebhookController {
                 return ResponseEntity.ok("Test OK");
             }
 
-            if ("merchant_order".equals(topic) || "topic_merchant_order_wh".equals(type)) {
-                log.info("webhook_received kind={} payment_id={} topic={} type={} action={} response_status={}",
-                        webhookKind, actualId, topic, type, "ignored_merchant_order", 200);
-                return ResponseEntity.ok("Ignored merchant_order");
-            }
-
             if (xSignature != null && xRequestId != null) {
                 // V1 Webhook: cryptographic HMAC-SHA256 signature validation
                 if (!signatureValidator.isValid(xSignature, xRequestId, actualId)) {
@@ -89,7 +83,7 @@ public class WebhookController {
                 }
                 log.info("webhook_received kind=signed_webhook payment_id={} topic={} type={} action={} response_status={}",
                         actualId, topic, type, "accepted", 200);
-                if ("payment".equals(type) || "payment".equals(topic)) {
+                if (isSupportedWebhookEvent(topic, type)) {
                     checkoutFacade.processWebHook(Long.valueOf(actualId), xRequestId, topic, type);
                 }
             } else if (xSignature != null || xRequestId != null) {
@@ -114,7 +108,7 @@ public class WebhookController {
 
                 log.info("webhook_received kind=ipn payment_id={} topic={} type={} origin_ip={} action={} response_status={}",
                         actualId, topic, type, clientIp, "accepted", 200);
-                if ("payment".equals(topic)) {
+                if (isSupportedWebhookEvent(topic, type)) {
                     // Forward a traceable synthetic event ID; idempotency is resolved in CheckoutFacade by payment status.
                     checkoutFacade.processWebHook(Long.valueOf(actualId), IPN_EVENT_ID_PREFIX + actualId, topic, type);
                 }
@@ -138,5 +132,12 @@ public class WebhookController {
             return forwarded.split(",")[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    private boolean isSupportedWebhookEvent(String topic, String type) {
+        return "payment".equals(topic)
+                || "payment".equals(type)
+                || "merchant_order".equals(topic)
+                || "topic_merchant_order_wh".equals(type);
     }
 }

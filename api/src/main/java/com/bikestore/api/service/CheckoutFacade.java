@@ -3,6 +3,7 @@ package com.bikestore.api.service;
 import com.bikestore.api.dto.request.CheckoutRequest;
 import com.bikestore.api.dto.response.CheckoutInfo;
 import com.bikestore.api.dto.response.CheckoutResponse;
+import com.bikestore.api.dto.response.MerchantOrderInfo;
 import com.bikestore.api.dto.response.PaymentInfo;
 import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.OrderItem;
@@ -87,11 +88,11 @@ public class CheckoutFacade {
         return new CheckoutResponse(order.getId(), checkoutInfo.preferenceId(), checkoutInfo.initPoint(), false, true, "CHECKOUT_READY");
     }
 
-    public void processWebHook(Long paymentId, String eventId) {
-        processWebHook(paymentId, eventId, null, null);
+    public void processWebHook(Long resourceId, String eventId) {
+        processWebHook(resourceId, eventId, null, null);
     }
 
-    public void processWebHook(Long paymentId, String eventId, String topic, String type) {
+    public void processWebHook(Long resourceId, String eventId, String topic, String type) {
         WebhookEvent event = null;
         String responseAction = "noop";
         String rejectionReason = null;
@@ -100,18 +101,26 @@ public class CheckoutFacade {
         String orderStatusBefore = null;
         String transitionApplied = "none";
         Long orderId = null;
+        String resourceKind = isMerchantOrderEvent(topic, type) ? "merchant_order" : "payment";
+        MerchantOrderInfo merchantOrderInfo = null;
 
         try {
-            PaymentInfo paymentInfo = paymentGatewayService.getPaymentInfo(paymentId);
-            mpStatus = normalize(paymentInfo.status());
-            externalReference = normalize(paymentInfo.externalReference());
-            String processingEventId = buildProcessingEventId(paymentId, mpStatus);
+            if ("merchant_order".equals(resourceKind)) {
+                merchantOrderInfo = paymentGatewayService.getMerchantOrderInfo(resourceId);
+                mpStatus = normalize(firstNonBlank(merchantOrderInfo.orderStatus(), merchantOrderInfo.status()));
+                externalReference = normalize(merchantOrderInfo.externalReference());
+            } else {
+                PaymentInfo paymentInfo = paymentGatewayService.getPaymentInfo(resourceId);
+                mpStatus = normalize(paymentInfo.status());
+                externalReference = normalize(paymentInfo.externalReference());
+            }
+            String processingEventId = buildProcessingEventId(resourceKind, resourceId, mpStatus);
 
             if (webhookEventRepository.existsByEventId(processingEventId)) {
                 responseAction = "duplicate_ignored";
                 log.info(
-                        "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} response_status={}",
-                        paymentId, topic, type, eventId, mpStatus, externalReference, responseAction, 200
+                        "webhook_resource_processed resource_kind={} resource_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} response_status={}",
+                        resourceKind, resourceId, topic, type, eventId, mpStatus, externalReference, responseAction, 200
                 );
                 return;
             }
@@ -121,15 +130,15 @@ public class CheckoutFacade {
                         .eventId(processingEventId)
                         .status(WebhookEventStatus.RECEIVED)
                         .payload(String.format(
-                                "{\"paymentId\":%d,\"incomingEventId\":\"%s\",\"topic\":\"%s\",\"type\":\"%s\",\"mpStatus\":\"%s\",\"externalReference\":\"%s\"}",
-                                paymentId, safeForPayload(eventId), safeForPayload(topic), safeForPayload(type), safeForPayload(mpStatus), safeForPayload(externalReference)
+                                "{\"resourceType\":\"%s\",\"resourceId\":%d,\"incomingEventId\":\"%s\",\"topic\":\"%s\",\"type\":\"%s\",\"mpStatus\":\"%s\",\"externalReference\":\"%s\"}",
+                                safeForPayload(resourceKind), resourceId, safeForPayload(eventId), safeForPayload(topic), safeForPayload(type), safeForPayload(mpStatus), safeForPayload(externalReference)
                         ))
                         .build());
             } catch (DataIntegrityViolationException duplicateEventException) {
                 responseAction = "duplicate_ignored";
                 log.info(
-                        "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} response_status={}",
-                        paymentId, topic, type, eventId, mpStatus, externalReference, responseAction, 200
+                        "webhook_resource_processed resource_kind={} resource_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} response_status={}",
+                        resourceKind, resourceId, topic, type, eventId, mpStatus, externalReference, responseAction, 200
                 );
                 return;
             }
@@ -138,8 +147,8 @@ public class CheckoutFacade {
                 rejectionReason = "missing_external_reference";
                 responseAction = "failed";
                 log.warn(
-                        "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} rejection_reason={} response_status={}",
-                        paymentId, topic, type, eventId, mpStatus, externalReference, responseAction, rejectionReason, 200
+                        "webhook_resource_processed resource_kind={} resource_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} rejection_reason={} response_status={}",
+                        resourceKind, resourceId, topic, type, eventId, mpStatus, externalReference, responseAction, rejectionReason, 200
                 );
                 event.setStatus(WebhookEventStatus.FAILED);
                 webhookEventRepository.save(event);
@@ -152,8 +161,8 @@ public class CheckoutFacade {
                 rejectionReason = "invalid_external_reference";
                 responseAction = "failed";
                 log.warn(
-                        "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} rejection_reason={} response_status={}",
-                        paymentId, topic, type, eventId, mpStatus, externalReference, responseAction, rejectionReason, 200
+                        "webhook_resource_processed resource_kind={} resource_id={} topic={} type={} event_id={} mp_status={} external_reference={} action={} rejection_reason={} response_status={}",
+                        resourceKind, resourceId, topic, type, eventId, mpStatus, externalReference, responseAction, rejectionReason, 200
                 );
                 event.setStatus(WebhookEventStatus.FAILED);
                 webhookEventRepository.save(event);
@@ -163,7 +172,14 @@ public class CheckoutFacade {
             Order order = orderRepository.findById(orderId).orElse(null);
             orderStatusBefore = order == null || order.getStatus() == null ? null : order.getStatus().name();
 
-            if ("approved".equals(mpStatus)) {
+            if ("merchant_order".equals(resourceKind)) {
+                if (merchantOrderInfo != null && merchantOrderInfo.isPaid()) {
+                    orderService.confirmOrder(orderId);
+                    transitionApplied = "to_paid";
+                } else {
+                    transitionApplied = "merchant_order_not_paid";
+                }
+            } else if ("approved".equals(mpStatus)) {
                 orderService.confirmOrder(orderId);
                 transitionApplied = "to_paid";
             } else if ("pending".equals(mpStatus)) {
@@ -177,14 +193,14 @@ public class CheckoutFacade {
             webhookEventRepository.save(event);
             responseAction = "processed";
             log.info(
-                    "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} order_id={} order_found={} order_status_before={} transition_applied={} action={} response_status={}",
-                    paymentId, topic, type, eventId, mpStatus, externalReference, orderId, order != null, orderStatusBefore, transitionApplied, responseAction, 200
+                    "webhook_resource_processed resource_kind={} resource_id={} topic={} type={} event_id={} mp_status={} external_reference={} order_id={} order_found={} order_status_before={} transition_applied={} action={} response_status={}",
+                    resourceKind, resourceId, topic, type, eventId, mpStatus, externalReference, orderId, order != null, orderStatusBefore, transitionApplied, responseAction, 200
             );
 
         } catch (Exception e) {
             log.error(
-                    "webhook_payment_processed payment_id={} topic={} type={} event_id={} mp_status={} external_reference={} order_id={} order_status_before={} transition_applied={} action={} rejection_reason={} response_status={}",
-                    paymentId, topic, type, eventId, mpStatus, externalReference, orderId, orderStatusBefore, transitionApplied, "failed", "exception", 500, e
+                    "webhook_resource_processed resource_kind={} resource_id={} topic={} type={} event_id={} mp_status={} external_reference={} order_id={} order_status_before={} transition_applied={} action={} rejection_reason={} response_status={}",
+                    resourceKind, resourceId, topic, type, eventId, mpStatus, externalReference, orderId, orderStatusBefore, transitionApplied, "failed", "exception", 500, e
             );
             if (event != null) {
                 event.setStatus(WebhookEventStatus.FAILED);
@@ -193,8 +209,8 @@ public class CheckoutFacade {
         }
     }
 
-    private String buildProcessingEventId(Long paymentId, String status) {
-        return "payment-" + paymentId + "-status-" + (status == null ? "unknown" : status);
+    private String buildProcessingEventId(String resourceKind, Long resourceId, String status) {
+        return resourceKind + "-" + resourceId + "-status-" + (status == null ? "unknown" : status);
     }
 
     private String normalize(String value) {
@@ -210,6 +226,18 @@ public class CheckoutFacade {
             return "";
         }
         return value.replace("\"", "\\\"");
+    }
+
+    private boolean isMerchantOrderEvent(String topic, String type) {
+        return "merchant_order".equals(normalize(topic)) || "topic_merchant_order_wh".equals(normalize(type));
+    }
+
+    private String firstNonBlank(String primary, String secondary) {
+        String normalizedPrimary = normalize(primary);
+        if (normalizedPrimary != null) {
+            return normalizedPrimary;
+        }
+        return normalize(secondary);
     }
 
     private List<ShippingQuotePublishedData.ShippingQuoteItemData> buildShippingQuoteItems(List<OrderItem> orderItems) {
