@@ -59,13 +59,24 @@ public class AuthController {
                     "timestamp": "2026-03-13T16:00:00.000Z"
                 }
                 """)))
-    @ApiResponse(responseCode = "403", description = "Account deactivated or not verified",
+    @ApiResponse(responseCode = "403", description = "Account deactivated",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class),
                     examples = @ExampleObject(value = """
                 {
                     "status": 403,
                     "error": "Forbidden",
-                    "message": "Account not verified. Please verify your email.",
+                    "message": "Your account has been deactivated. Please contact support.",
+                    "timestamp": "2026-03-13T16:00:00.000Z"
+                }
+                """)))
+    @ApiResponse(responseCode = "409", description = "Email not verified",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class),
+                    examples = @ExampleObject(value = """
+                {
+                    "status": 409,
+                    "error": "Conflict",
+                    "message": "Please verify your email before logging in.",
+                    "errorCode": "EMAIL_NOT_VERIFIED",
                     "timestamp": "2026-03-13T16:00:00.000Z"
                 }
                 """)))
