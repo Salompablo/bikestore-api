@@ -2,6 +2,7 @@ package com.bikestore.api;
 
 import com.bikestore.api.dto.request.CartItemRequest;
 import com.bikestore.api.dto.request.CheckoutRequest;
+import com.bikestore.api.dto.response.MerchantOrderInfo;
 import com.bikestore.api.dto.response.PaymentInfo;
 import com.bikestore.api.entity.Category;
 import com.bikestore.api.entity.Order;
@@ -450,5 +451,38 @@ class StockReservationIntegrationTest {
         List<WebhookEvent> events = webhookEventRepository.findAll();
         assertEquals(2, events.size(),
                 "Pending and approved statuses must be processed once each");
+    }
+
+    @Test
+    @DisplayName("Merchant order webhook: paid merchant order must confirm the order")
+    void testMerchantOrderWebhookConfirmsPaidOrder() {
+        Product product = createProduct(3);
+        Order order = orderService.createPendingOrder(checkoutFor(product.getId(), 1), testUser);
+        long merchantOrderId = 303030L;
+
+        when(paymentGatewayService.getMerchantOrderInfo(merchantOrderId))
+                .thenReturn(new MerchantOrderInfo(
+                        "closed",
+                        "paid",
+                        order.getId().toString(),
+                        order.getTotalAmount(),
+                        order.getTotalAmount()
+                ));
+
+        assertDoesNotThrow(() -> checkoutFacade.processWebHook(
+                merchantOrderId,
+                "EVENT-MERCHANT-ORDER-" + UUID.randomUUID(),
+                null,
+                "topic_merchant_order_wh"
+        ));
+
+        Order updatedOrder = orderRepository.findById(order.getId()).orElseThrow();
+        assertEquals(OrderStatus.PAID, updatedOrder.getStatus(),
+                "Order must transition to PAID when the merchant order is fully paid");
+
+        List<WebhookEvent> events = webhookEventRepository.findAll();
+        assertEquals(1, events.size(), "Merchant order webhook must be persisted once");
+        assertEquals(WebhookEventStatus.PROCESSED, events.get(0).getStatus(),
+                "Merchant order webhook must end as PROCESSED");
     }
 }
