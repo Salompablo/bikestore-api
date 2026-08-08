@@ -74,7 +74,7 @@ public class WebhookController {
                 return ResponseEntity.ok("Test OK");
             }
 
-            if ("merchant_order".equals(topic)) {
+            if ("merchant_order".equals(topic) || "topic_merchant_order_wh".equals(type)) {
                 log.info("webhook_received kind={} payment_id={} topic={} type={} action={} response_status={}",
                         webhookKind, actualId, topic, type, "ignored_merchant_order", 200);
                 return ResponseEntity.ok("Ignored merchant_order");
