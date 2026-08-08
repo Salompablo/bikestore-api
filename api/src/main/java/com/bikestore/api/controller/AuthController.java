@@ -3,6 +3,7 @@ package com.bikestore.api.controller;
 import com.bikestore.api.annotation.ApiNotFound;
 import com.bikestore.api.annotation.ApiPublicErrors;
 import com.bikestore.api.dto.request.*;
+import com.bikestore.api.dto.response.AccountStatusResponse;
 import com.bikestore.api.dto.response.AuthResponse;
 import com.bikestore.api.dto.response.ErrorResponse;
 import com.bikestore.api.dto.response.MessageResponse;
@@ -91,6 +92,25 @@ public class AuthController {
             @Parameter(description = "6-digit verification code", example = "123456", required = true)
             @RequestParam String token) {
         return ResponseEntity.ok(authService.verifyEmail(token));
+    }
+
+    @Operation(summary = "Resend verification code", description = "Resends the verification code for accounts pending email verification.")
+    @ApiResponse(responseCode = "200", description = "Verification code resent")
+    @ApiNotFound
+    @ApiPublicErrors
+    @PostMapping("/resend-verification")
+    public ResponseEntity<MessageResponse> resendVerification(@Valid @RequestBody EmailRequest request) {
+        authService.resendVerificationCode(request.email());
+        return ResponseEntity.ok(new MessageResponse("Verification code resent successfully."));
+    }
+
+    @Operation(summary = "Get account status", description = "Returns account verification and pending-verification status for a given email.")
+    @ApiResponse(responseCode = "200", description = "Account status retrieved")
+    @ApiNotFound
+    @ApiPublicErrors
+    @PostMapping("/account-status")
+    public ResponseEntity<AccountStatusResponse> getAccountStatus(@Valid @RequestBody EmailRequest request) {
+        return ResponseEntity.ok(authService.getAccountStatus(request.email()));
     }
 
     @Operation(summary = "Request account reactivation", description = "Sends a reactivation code to a deactivated account.")

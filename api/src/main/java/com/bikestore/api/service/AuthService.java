@@ -4,6 +4,7 @@ import com.bikestore.api.dto.request.ForgotPasswordRequest;
 import com.bikestore.api.dto.request.LoginRequest;
 import com.bikestore.api.dto.request.RegisterRequest;
 import com.bikestore.api.dto.request.ResetPasswordRequest;
+import com.bikestore.api.dto.response.AccountStatusResponse;
 import com.bikestore.api.dto.response.AuthResponse;
 import com.bikestore.api.entity.User;
 import com.bikestore.api.event.SendEmailEvent;
@@ -68,7 +69,11 @@ public class AuthService {
         }
 
         if (!user.getIsEmailVerified()) {
-            throw new AccountDeactivatedException("Please verify your email before logging in.");
+            throw new ConflictException(
+                    "Please verify your email before logging in.",
+                    "EMAIL_NOT_VERIFIED",
+                    null
+            );
         }
 
         authenticationManager.authenticate(
@@ -77,6 +82,32 @@ public class AuthService {
 
         String jwtToken = jwtService.generateToken(user);
         return new AuthResponse(jwtToken, "Login successful");
+    }
+
+    @Transactional
+    public void resendVerificationCode(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!user.getIsActive()) {
+            throw new AccountDeactivatedException("Your account has been deactivated. Please request account reactivation.");
+        }
+
+        if (user.getIsEmailVerified()) {
+            throw new ConflictException("Email is already verified", "EMAIL_ALREADY_VERIFIED", null);
+        }
+
+        String verificationCode = tokenService.generateAndSaveVerificationToken(user);
+        eventPublisher.publishEvent(new SendEmailEvent(this, user.getEmail(), verificationCode, SendEmailEvent.EmailType.VERIFICATION));
+    }
+
+    @Transactional(readOnly = true)
+    public AccountStatusResponse getAccountStatus(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        boolean pendingVerification = user.getIsActive() && !user.getIsEmailVerified();
+        return new AccountStatusResponse(user.getIsActive(), user.getIsEmailVerified(), pendingVerification);
     }
 
     @Transactional

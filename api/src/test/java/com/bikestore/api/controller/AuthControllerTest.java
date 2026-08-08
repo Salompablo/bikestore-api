@@ -1,6 +1,7 @@
 package com.bikestore.api.controller;
 
 import com.bikestore.api.dto.request.*;
+import com.bikestore.api.dto.response.AccountStatusResponse;
 import com.bikestore.api.dto.response.AuthResponse;
 import com.bikestore.api.dto.response.MessageResponse;
 import com.bikestore.api.service.AuthService;
@@ -150,6 +151,60 @@ class AuthControllerTest {
             assertEquals("jwt-verified-token", response.getBody().token());
             assertEquals("Email verified successfully", response.getBody().message());
             verify(authService).verifyEmail(token);
+        }
+
+        @Nested
+        @DisplayName("POST /api/v1/auth/resend-verification")
+        class ResendVerification {
+
+            @Test
+            @DisplayName("Should return 200 OK with success message when resend succeeds")
+            void resendVerification_success_returns200() {
+                EmailRequest request = new EmailRequest("joe@example.com");
+
+                doNothing().when(authService).resendVerificationCode("joe@example.com");
+
+                ResponseEntity<MessageResponse> response = authController.resendVerification(request);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertNotNull(response.getBody());
+                assertEquals("Verification code resent successfully.", response.getBody().message());
+                verify(authService).resendVerificationCode("joe@example.com");
+            }
+
+            @Test
+            @DisplayName("Should propagate service exceptions when resend fails")
+            void resendVerification_serviceThrows_propagates() {
+                EmailRequest request = new EmailRequest("joe@example.com");
+
+                doThrow(new RuntimeException("Already verified")).when(authService).resendVerificationCode("joe@example.com");
+
+                assertThrows(RuntimeException.class, () -> authController.resendVerification(request));
+                verify(authService).resendVerificationCode("joe@example.com");
+            }
+        }
+
+        @Nested
+        @DisplayName("POST /api/v1/auth/account-status")
+        class AccountStatus {
+
+            @Test
+            @DisplayName("Should return 200 OK with account status")
+            void getAccountStatus_success_returns200() {
+                EmailRequest request = new EmailRequest("pending@example.com");
+                AccountStatusResponse expected = new AccountStatusResponse(true, false, true);
+
+                when(authService.getAccountStatus("pending@example.com")).thenReturn(expected);
+
+                ResponseEntity<AccountStatusResponse> response = authController.getAccountStatus(request);
+
+                assertEquals(HttpStatus.OK, response.getStatusCode());
+                assertNotNull(response.getBody());
+                assertTrue(response.getBody().isActive());
+                assertFalse(response.getBody().isEmailVerified());
+                assertTrue(response.getBody().pendingVerification());
+                verify(authService).getAccountStatus("pending@example.com");
+            }
         }
 
         @Test
