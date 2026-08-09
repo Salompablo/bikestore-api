@@ -30,6 +30,9 @@ public class MercadoPagoServiceImpl implements PaymentGatewayService {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
+    @Value("${mercadopago.notification-url}")
+    private String notificationUrl;
+
     @Override
     public CheckoutInfo createPreference(Order order) {
         try {
@@ -64,6 +67,7 @@ public class MercadoPagoServiceImpl implements PaymentGatewayService {
             PreferenceRequest.PreferenceRequestBuilder requestBuilder = PreferenceRequest.builder()
                     .items(mpItems)
                     .backUrls(backUrls)
+                    .notificationUrl(notificationUrl)
                     .externalReference(order.getId().toString());
 
             if (frontendUrl.startsWith("https://")) {
