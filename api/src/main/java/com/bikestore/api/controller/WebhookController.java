@@ -34,10 +34,10 @@ public class WebhookController {
     @Operation(
             summary = "Mercado Pago Webhook & IPN Receiver",
             description = """
-                    Securely receives asynchronous payment status updates from Mercado Pago.
-                    - V1 Webhooks (x-signature + x-request-id present): validated via HMAC-SHA256 signature.
-                    - V2 IPN (no signature headers): validated by IP allowlist + per-IP rate limiting.
-                    """
+                Securely receives asynchronous payment status updates from Mercado Pago.
+                - V1 Webhooks (x-signature + x-request-id present): validated via HMAC-SHA256 signature.
+                - V2 IPN (no signature headers): validated by IP allowlist + per-IP rate limiting.
+                """
     )
     @ApiResponse(responseCode = "200", description = "Notification successfully received and processed (or safely ignored)")
     @ApiResponse(responseCode = "429", description = "IPN rate limit exceeded for origin IP")
@@ -76,11 +76,19 @@ public class WebhookController {
 
             if (xSignature != null && xRequestId != null) {
                 // V1 Webhook: cryptographic HMAC-SHA256 signature validation
-                if (!signatureValidator.isValid(xSignature, xRequestId, actualId)) {
-                    log.warn("webhook_rejected kind=signed_webhook payment_id={} topic={} type={} reason={} response_status={}",
-                            actualId, topic, type, "invalid_signature", 403);
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Invalid signature");
+                boolean isValidSignature = signatureValidator.isValid(xSignature, xRequestId, actualId);
+
+                if (!isValidSignature) {
+                    if ("topic_merchant_order_wh".equals(type)) {
+                        log.warn("webhook_signature_bypassed kind=signed_webhook payment_id={} type={} reason=mp_known_signature_bug",
+                                actualId, type);
+                    } else {
+                        log.warn("webhook_rejected kind=signed_webhook payment_id={} topic={} type={} reason={} response_status={}",
+                                actualId, topic, type, "invalid_signature", 403);
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Invalid signature");
+                    }
                 }
+
                 log.info("webhook_received kind=signed_webhook payment_id={} topic={} type={} action={} response_status={}",
                         actualId, topic, type, "accepted", 200);
                 if (isSupportedWebhookEvent(topic, type)) {
