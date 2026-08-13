@@ -64,17 +64,13 @@ public class MercadoPagoServiceImpl implements PaymentGatewayService {
                     .build();
 
             PreferenceClient client = new PreferenceClient();
-            PreferenceRequest.PreferenceRequestBuilder requestBuilder = PreferenceRequest.builder()
+            PreferenceRequest request = PreferenceRequest.builder()
                     .items(mpItems)
                     .backUrls(backUrls)
                     .notificationUrl(notificationUrl)
-                    .externalReference(order.getId().toString());
-
-            if (frontendUrl.startsWith("https://")) {
-                requestBuilder.autoReturn("approved");
-            }
-
-            PreferenceRequest request = requestBuilder.build();
+                    .externalReference(order.getId().toString())
+                    .autoReturn("approved")
+                    .build();
 
             Preference preference = client.create(request);
             return new CheckoutInfo(preference.getId(), preference.getInitPoint());

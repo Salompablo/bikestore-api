@@ -148,4 +148,73 @@ public class WebhookController {
                 || "merchant_order".equals(topic)
                 || "topic_merchant_order_wh".equals(type);
     }
+
+    /**
+     * Mercado Pago test-environment webhook receiver.
+     *
+     * <p>In Mercado Pago's test mode, Checkout Pro test payments do not trigger real webhook
+     * notifications. To test the full flow, configure a <strong>separate</strong> webhook URL
+     * (ending in {@code /api/v1/webhook/mercadopago/test}) in the "Tus integraciones" panel under
+     * the test environment. This endpoint accepts the same payload format as the production
+     * endpoint but skips HMAC signature validation, since test-mode notifications may not
+     * include a valid signature.
+     *
+     * <p><strong>Important:</strong> This endpoint must <em>never</em> be used as the production
+     * webhook URL. It is intentionally separate so that credentials and signatures are enforced in
+     * production while remaining flexible in test mode.
+     */
+    @Operation(
+            summary = "Mercado Pago Test-Mode Webhook Receiver",
+            description = """
+                    Receives Mercado Pago webhook notifications for the **test environment only**.
+                    Signature validation is skipped, since test-mode notifications may not carry a valid HMAC signature.
+
+                    Configure this URL (`/api/v1/webhook/mercadopago/test`) as the webhook endpoint
+                    in the Mercado Pago "Tus integraciones" panel under the test environment.
+                    Use `/api/v1/webhook/mercadopago` (the production endpoint) for the live environment.
+                    """
+    )
+    @ApiResponse(responseCode = "200", description = "Notification successfully received and processed (or safely ignored)")
+    @ApiPublicErrors
+    @PostMapping("/mercadopago/test")
+    public ResponseEntity<String> receiveTestWebhook(
+            @Parameter(description = "Mercado Pago resource ID sent via Webhook URL")
+            @RequestParam(value = "data.id", required = false) String dataIdUrl,
+
+            @Parameter(description = "Mercado Pago resource ID sent via IPN URL")
+            @RequestParam(value = "id", required = false) String ipnId,
+
+            @Parameter(description = "Topic of the notification (e.g., 'payment' or 'merchant_order')")
+            @RequestParam(value = "topic", required = false) String topic,
+
+            @Parameter(description = "Type of the notification (e.g., 'payment')")
+            @RequestParam(value = "type", required = false) String type,
+
+            @Parameter(description = "Unique request ID for tracing")
+            @RequestHeader(value = "x-request-id", required = false) String xRequestId) {
+
+        try {
+            String actualId = dataIdUrl != null ? dataIdUrl : ipnId;
+
+            if (actualId == null) {
+                log.info("test_webhook_received payment_id={} topic={} type={} action={} response_status={}",
+                        null, topic, type, "ignored_empty_payload", 200);
+                return ResponseEntity.ok("Test OK");
+            }
+
+            log.info("test_webhook_received payment_id={} topic={} type={} action={} response_status={}",
+                    actualId, topic, type, "accepted", 200);
+
+            if (isSupportedWebhookEvent(topic, type)) {
+                String eventId = xRequestId != null ? "test-" + xRequestId : "test-ipn-" + actualId;
+                checkoutFacade.processWebHook(Long.valueOf(actualId), eventId, topic, type);
+            }
+
+            return ResponseEntity.ok("OK");
+
+        } catch (Exception e) {
+            log.error("Error handling test webhook payload", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing failed");
+        }
+    }
 }

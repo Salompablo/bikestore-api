@@ -4,6 +4,7 @@ import com.bikestore.api.dto.request.CheckoutRequest;
 import com.bikestore.api.dto.response.CheckoutInfo;
 import com.bikestore.api.dto.response.CheckoutResponse;
 import com.bikestore.api.dto.response.MerchantOrderInfo;
+import com.bikestore.api.dto.response.OrderResponse;
 import com.bikestore.api.dto.response.PaymentInfo;
 import com.bikestore.api.entity.Order;
 import com.bikestore.api.entity.OrderItem;
@@ -13,6 +14,7 @@ import com.bikestore.api.entity.enums.DeliveryMethod;
 import com.bikestore.api.entity.enums.WebhookEventStatus;
 import com.bikestore.api.event.ShippingQuotePublishedData;
 import com.bikestore.api.event.ShippingQuotePublishedEvent;
+import com.bikestore.api.exception.ResourceNotFoundException;
 import com.bikestore.api.repository.OrderRepository;
 import com.bikestore.api.repository.WebhookEventRepository;
 import lombok.RequiredArgsConstructor;
@@ -91,6 +93,60 @@ public class CheckoutFacade {
     public void processWebHook(Long resourceId, String eventId) {
         processWebHook(resourceId, eventId, null, null);
     }
+
+    /**
+     * Confirms a payment using the Mercado Pago {@code collection_id} (payment ID) sent as a
+     * query parameter to the back_url on successful redirect.
+     *
+     * <p>This is the primary confirmation path for test-mode purchases, where Mercado Pago does not
+     * send webhook notifications for Checkout Pro test payments. It fetches payment details
+     * directly from the MP API (server-to-server), validates that the payment belongs to the
+     * authenticated user's order, and — if approved — marks the order as PAID.
+     *
+     * @param collectionId the Mercado Pago payment ID received in the redirect URL
+     * @param orderId      the order ID received in the redirect URL (from {@code external_reference})
+     * @param authenticatedUser the currently authenticated customer
+     * @return the updated {@link OrderResponse} for the confirmed order
+     */
+    @Transactional
+    public OrderResponse confirmPaymentByCollectionId(Long collectionId, Long orderId, User authenticatedUser) {
+        PaymentInfo paymentInfo = paymentGatewayService.getPaymentInfo(collectionId);
+
+        String externalRef = normalize(paymentInfo.externalReference());
+        Long resolvedOrderId;
+        try {
+            resolvedOrderId = Long.parseLong(externalRef != null ? externalRef : "");
+        } catch (NumberFormatException e) {
+            log.warn("checkout_confirm_rejected collection_id={} order_id={} reason=invalid_external_reference mp_ref={}",
+                    collectionId, orderId, externalRef);
+            throw new IllegalArgumentException("Payment does not reference a valid order.");
+        }
+
+        if (!resolvedOrderId.equals(orderId)) {
+            log.warn("checkout_confirm_rejected collection_id={} order_id={} reason=external_reference_mismatch mp_ref={}",
+                    collectionId, orderId, externalRef);
+            throw new ResourceNotFoundException("Order not found with id: " + orderId);
+        }
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+
+        if (!order.getUser().getId().equals(authenticatedUser.getId())) {
+            throw new ResourceNotFoundException("Order not found with id: " + orderId);
+        }
+
+        String mpStatus = normalize(paymentInfo.status());
+        log.info("checkout_confirm collection_id={} order_id={} mp_status={}", collectionId, orderId, mpStatus);
+
+        if ("approved".equals(mpStatus)) {
+            orderService.confirmOrder(orderId);
+        } else if ("pending".equals(mpStatus)) {
+            orderService.markOrderAsPending(orderId);
+        }
+
+        return orderService.getMyOrderById(orderId, authenticatedUser);
+    }
+
 
     public void processWebHook(Long resourceId, String eventId, String topic, String type) {
         WebhookEvent event = null;
