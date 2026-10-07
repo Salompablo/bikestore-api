@@ -8,7 +8,7 @@
 
 Backend API for **Bikes Asaro**, a bicycle e-commerce platform. The service is built with **Java 21**, **Spring Boot**, and **PostgreSQL**, and it integrates catalog management, checkout orchestration, shipping workflows, payments, notifications, and customer account management in a single backend.
 
-This backend works together with the Angular frontend available at **[Salompablo/bikes-asaro-front](https://github.com/Salompablo/bikes-asaro-front)**. The platform is also designed to be deployed under the **bikesasaro.com.ar** domain.
+This backend works together with the Angular frontend available at **[Salompablo/bikes-asaro-front](https://github.com/Salompablo/bikes-asaro-front)**. The platform is deployed in the cloud under **[bikesasaro.com.ar](https://www.bikesasaro.com.ar)** (API on AWS Lightsail, PostgreSQL on Supabase, images on AWS S3). Commercial launch is pending, so online payments are disabled in production for now.
 
 ## Table of Contents
 
